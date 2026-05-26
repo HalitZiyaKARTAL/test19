@@ -592,7 +592,7 @@ dialog::backdrop { background: rgba(0,0,0,0.85); backdrop-filter: blur(4px); }
 		}
 		activeViewList.slice(1).forEach(step => { const n = chatTree.nodes[step.id]; if (n && typeof step.v === 'number') n.activeVersion = Math.min(Math.max(step.v, 0), Math.max(0, n.versions.length - 1)); });
 		updateMetadata(m => { const mT = m.chatStates?.[CHAT_ID]?.tabs; if (mT) { const now = Date.now(); for (const pid in mT) { if (now - mT[pid].epoch > 86400000) delete mT[pid]; } } });
-		saveActiveView();
+		
 	}
 
 	function charStat(cLen, tLen = 0) { return tLen > 0 ? `${cLen}(+${tLen})c` : `${cLen}c`; }
