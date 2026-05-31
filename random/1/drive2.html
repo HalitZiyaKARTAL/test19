@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>File Inspector / Decoder / Searcher</title>
+<style>
+:root{--bg:#0f1018;--panel:#181a27;--panel2:#202335;--line:#303449;--text:#e5e7f1;--muted:#9198af;--accent:#6593ff;--ok:#50bf8a;--warn:#e0aa4e;--bad:#e46b79;--mark:#54451a;--rad:13px}
+*{box-sizing:border-box}html,body{margin:0;background:var(--bg);color:var(--text);font:14px system-ui,-apple-system,Segoe UI,Roboto,sans-serif}body{padding-bottom:76px}
+button,input,select{font:inherit;color:inherit}button{border:1px solid var(--line);background:var(--panel2);border-radius:10px;padding:9px 12px;cursor:pointer}button.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:650}button.danger{color:var(--bad)}button:disabled{opacity:.45;cursor:not-allowed}input,select{width:100%;background:#11131d;border:1px solid var(--line);border-radius:9px;padding:9px 10px;outline:none}input:focus,select:focus{border-color:var(--accent)}input[type=checkbox]{width:auto;accent-color:var(--accent)}h1{font-size:18px;margin:0}h2{font-size:15px;margin:0}p{margin:5px 0}.muted{color:var(--muted)}.tiny{font-size:12px}.mono{font-family:ui-monospace,SFMono-Regular,Consolas,monospace}.top{position:sticky;top:0;z-index:4;background:rgba(15,16,24,.94);backdrop-filter:blur(10px);border-bottom:1px solid var(--line);padding:12px}.topin{max-width:1400px;margin:auto;display:flex;align-items:center;justify-content:space-between;gap:10px}.stats{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}.badge{border:1px solid var(--line);background:var(--panel);border-radius:99px;padding:4px 8px;font-size:12px;color:var(--muted)}.badge.ok{color:var(--ok);border-color:#285e48}.badge.warn{color:var(--warn);border-color:#654c22}.badge.bad{color:var(--bad);border-color:#682d36}
+.layout{max-width:1400px;margin:auto;padding:10px;display:grid;grid-template-columns:295px minmax(330px,1fr) 360px;gap:10px}.col{min-width:0}.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--rad);padding:12px;margin-bottom:10px}.title{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.field{margin:8px 0}.field label{display:block;color:var(--muted);font-size:12px;margin:0 0 4px}.row{display:flex;align-items:center;gap:7px;flex-wrap:wrap}.row>*{flex:1}.row>button{flex:none}.note{padding:8px 9px;border-radius:9px;background:#131622;color:var(--muted);font-size:12px;margin-top:8px}.hint{color:var(--muted);font-size:12px;margin-top:9px}.path{font-size:13px;word-break:break-all;margin-bottom:8px}.toolbar{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}.toolbar button{padding:7px 9px;font-size:13px}.list{display:flex;flex-direction:column;gap:7px;max-height:68vh;overflow:auto}.file{border:1px solid var(--line);background:#151723;border-radius:10px;padding:9px;display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:start}.file.folder{border-color:#3b435b}.file .name{font-weight:550;word-break:break-word}.file .meta{color:var(--muted);font-size:12px;margin-top:3px}.status{font-size:11px;color:var(--muted)}.status.ok{color:var(--ok)}.status.bad{color:var(--bad)}.prog{height:7px;border-radius:8px;background:#11131d;overflow:hidden;margin:8px 0}.prog>div{height:100%;background:var(--accent);width:0}.summary{display:flex;gap:7px;flex-wrap:wrap}.summary .badge{background:#11131d}.result{border:1px solid var(--line);border-radius:10px;background:#151723;padding:10px;margin:7px 0}.result .head{display:flex;justify-content:space-between;gap:10px}.snippet{background:#10121b;border-radius:8px;padding:8px;margin-top:7px;color:#d5d8e5;white-space:pre-wrap;word-break:break-word;font-size:13px}.snippet mark{background:var(--mark);color:#ffe9a7;border-radius:3px}.empty{text-align:center;color:var(--muted);padding:22px 10px}.sticky{display:none;position:fixed;bottom:0;left:0;right:0;z-index:5;background:rgba(24,26,39,.96);border-top:1px solid var(--line);padding:9px;gap:9px;align-items:center;justify-content:space-between}.sticky.show{display:flex}.sticky button{min-width:145px}.modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.68);z-index:8;padding:12px}.modal.show{display:flex}.dialog{background:var(--panel);border:1px solid var(--line);border-radius:14px;max-width:900px;width:100%;max-height:96vh;margin:auto;display:flex;flex-direction:column}.dialogHead{padding:12px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:10px}.tabs{display:flex;gap:6px;padding:9px 12px;border-bottom:1px solid var(--line)}.tabs button.on{background:var(--accent);border-color:var(--accent)}.view{padding:12px;overflow:auto;white-space:pre-wrap;word-break:break-word;line-height:1.5}.msg{margin-bottom:12px;padding:9px;border-radius:10px;background:#131622}.msg.user{border-left:3px solid var(--accent)}.msg.assistant{border-left:3px solid var(--ok)}.msg.thought{border-left:3px solid var(--warn)}.msg .who{color:var(--muted);font-size:11px;margin-bottom:5px}.hide{display:none!important}
+@media(max-width:980px){.layout{display:block;padding:9px}.list{max-height:none}.top{position:static}.stats{display:none}.sticky.show{display:flex}.file{grid-template-columns:auto 1fr}.file .open{grid-column:2}}
+
+/* Read Access visual layer: touch-first list identity with compact controls */
+:root{--bg:#090d19;--panel:#111827;--panel2:#1b2740;--line:#253552;--text:#e6eefc;--muted:#91a2bf;--accent:#60a5fa;--violet:#a78bfa;--pink:#f472b6;--gold:#fde047;--ok:#49d39a;--warn:#fbbf24;--bad:#fb7185;--mark:#584723;--rad:15px}
+html{background:var(--bg)}body{background:radial-gradient(circle at 50% -5%,#1d284f 0,#0c1222 29rem,var(--bg) 52rem);min-height:100vh}
+.hero{padding:28px 12px 18px}.heroIn{max-width:1400px;margin:auto;text-align:center;position:relative}.hero h1{font-size:clamp(2.7rem,7vw,4rem);line-height:1.05;margin:0;font-weight:820;letter-spacing:-.055em;background:linear-gradient(135deg,var(--accent),var(--violet),var(--pink));background-clip:text;-webkit-background-clip:text;color:transparent;-webkit-text-fill-color:transparent}.tag{font-size:15px;color:#b9c7e2;margin:7px 0 16px}.flow{display:inline-flex;align-items:center;gap:8px;padding:7px;border:1px solid var(--line);background:#101a2ccb;border-radius:99px;color:var(--muted);font-size:12px}.flow span{padding:5px 11px;border-radius:99px;background:#172338;color:#c8d5ed}.flow i{font-style:normal;color:var(--violet)}.hero .stats{position:absolute;right:0;top:7px}
+.layout{padding:0 12px 18px;grid-template-columns:300px minmax(350px,1fr) 370px;gap:12px}
+.card{background:linear-gradient(150deg,#121b2d,#101624);border-color:var(--line);box-shadow:0 10px 34px #00000029;padding:13px;border-radius:var(--rad)}
+.title{margin-bottom:12px}.title h2{font-size:14px;letter-spacing:.055em;text-transform:uppercase;color:#bccbe4}
+.connect{border-color:#364e78;background:linear-gradient(150deg,#15213a,#101725)}.browser{border-color:#2c4268;min-height:420px}.decode,.search{border-color:#273b61}.resultPanel{min-height:260px}
+button{background:#18243a;border-color:#304663;transition:transform .15s ease,border-color .15s ease,background .15s ease}button:hover{border-color:var(--accent);background:#1d2e4d;transform:translateY(-1px)}button:active{transform:translateY(0)}button.primary{border:0;background:linear-gradient(125deg,#377eed,#8075ef);box-shadow:0 8px 21px #377eed40}button.primary:hover{background:linear-gradient(125deg,#5094ff,#9b88ff)}input,select{background:#0c1322;border-color:#293a5c;border-radius:11px;padding:10px}input:focus,select:focus{border-color:var(--accent);box-shadow:0 0 0 2px #60a5fa22}.badge{background:#0e1627;border-color:#283951;padding:4px 9px}.badge.ok{background:#112b27;color:#61deb0}.badge.warn{background:#2b2413;color:#ffd064}.badge.bad{background:#301921;color:#ff91a0}
+.note{background:#0d1728;border:1px solid #263b60;border-radius:11px}.hint{border-top:1px dashed #253654;padding-top:10px;line-height:1.5}
+.path{background:#0d1628;border:1px solid #273a5e;border-radius:12px;padding:10px 12px;margin-bottom:10px;display:flex;gap:7px;align-items:center;flex-wrap:wrap}.path small{width:100%;font-size:10px;letter-spacing:.14em;color:#7388ab}.path span{color:#a4b4cf}.path b{font-weight:400;color:#536989}.path .cur{color:var(--gold);font-weight:700;text-shadow:0 0 11px #fde04744}
+.list{gap:9px}.file{background:#111c30;border-color:#263957;border-radius:13px;padding:13px 12px;gap:11px;transition:transform .16s ease,border-color .16s ease,box-shadow .16s ease}.file:hover{transform:translateY(-2px);border-color:#4785d9;box-shadow:0 7px 20px #00000033}.file.sel{border:2px solid var(--violet);padding:12px 11px;background:#191d36;box-shadow:0 0 18px #a78bfa22}.file.folder{background:#152034;border-color:#334760}.file.folder .name{color:var(--gold);font-weight:720;text-shadow:0 0 9px #fde04735}.folderI{font-size:18px;line-height:22px}.file .name{font-size:15px}.file .meta{margin-top:5px}.file .status{margin-top:5px;font-weight:600;text-transform:uppercase;letter-spacing:.04em}.file input.pick{margin-top:3px;width:18px;height:18px}.file .open button{padding:6px 9px}
+.prog{height:9px;border-radius:10px}.prog>div{background:linear-gradient(90deg,var(--accent),var(--violet))}
+.result{background:#101a2d;border-color:#283c5e;border-radius:13px;padding:12px}.result:hover{border-color:#426baf}.snippet{background:#0b1323;border:1px solid #202e4c;border-radius:10px;line-height:1.43}.snippet mark{background:#634d16;color:#fff2a8;padding:0 2px}
+.dialog{background:#101827;border-color:#334a70;box-shadow:0 20px 70px #000a}.dialogHead{background:#131f35}.view{background:#0e1525}.msg{background:#121d31;border:1px solid #223453;padding:12px}
+.session{background:#0d1423}.sticky{background:#111a2ced;backdrop-filter:blur(14px)}
+.empty{background:#0d1526;border-radius:13px;border:1px dashed #253654;margin:5px 0}
+@media(max-width:1100px) and (min-width:981px){.layout{grid-template-columns:290px 1fr}.side{grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr;gap:12px}.side .card{margin-bottom:0}}
+@media(max-width:980px){body{padding-bottom:80px}.hero{padding:25px 10px 16px}.hero .stats{position:static;display:flex;justify-content:center;margin-top:13px}.hero h1{font-size:3rem}.layout{padding:0 9px}.card{padding:12px;margin-bottom:9px}.browser{min-height:0}.file{padding:13px 11px}.file.sel{padding:12px 10px}.flow{gap:4px}.flow span{padding:5px 8px}}
+
+</style>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+</head>
+<body>
+<header class="hero"><div class="heroIn">
+ <h1>Read Access</h1>
+ <p class="tag">Browse · Decode · Search · Report</p>
+ <div class="flow"><span>Connect</span><i>→</i><span>Filter</span><i>→</i><span>Decode</span><i>→</i><span>Find</span></div>
+ <div class="stats"><span id="connBadge" class="badge">Disconnected</span><span id="loadedBadge" class="badge">0 decoded</span><span id="hitBadge" class="badge">0 hits</span></div>
+</div></header>
+<main class="layout">
+<aside class="col controls">
+<section class="card connect">
+ <div class="title"><h2>Connection</h2><span id="scopeBadge" class="badge ok">READ ONLY</span></div>
+ <div class="field"><label>Source</label><select id="source"><option value="drive">Google Drive</option><option value="local">Local Files</option></select></div>
+ <div id="driveAuth">
+  <form id="driveForm" autocomplete="on">
+   <div class="field"><label>OAuth Client ID</label><input id="clientId" name="google-drive-client-id" placeholder="…apps.googleusercontent.com" autocomplete="on" autocapitalize="none" spellcheck="false"></div>
+   <div class="field"><label>Scope</label><input id="scope" name="google-drive-scope" value="https://www.googleapis.com/auth/drive.readonly" autocomplete="off"></div>
+   <label class="tiny muted"><input type="checkbox" id="remember"> Remember Client ID locally</label>
+   <div class="toolbar"><button class="primary" id="connect" type="submit">Connect Drive</button><button id="disconnect" type="button" disabled>Disconnect</button></div>
+  </form>
+  <div id="scopeMsg" class="note">Read-only: may list and download accessible Drive files; this page contains no Drive write actions.</div>
+  <p class="hint">How to: Send source code of this html to an ai and tell what you wanna use it for and how.</p>
+ </div>
+ <div id="localAuth" class="hide">
+  <div class="toolbar"><button class="primary" id="pickFiles">Choose Files</button><button id="pickFolder">Choose Folder</button></div>
+  <input id="fileInput" class="hide" type="file" multiple><input id="folderInput" class="hide" type="file" webkitdirectory multiple>
+  <p class="hint">Local files remain in this page only.</p>
+ </div>
+</section>
+<section class="card filters" id="filtersCard">
+ <div class="title"><h2>File filters</h2><button id="resetFilters">Reset</button></div>
+ <div class="field"><label>Name contains</label><input id="fName"></div>
+ <div class="grid"><div class="field"><label>Extension(s)</label><input id="fExt" placeholder="json, txt or noext"></div><div class="field"><label>MIME contains</label><input id="fMime" placeholder="text/"></div></div>
+ <div class="field"><label>Created date</label><div class="row"><input id="fCreatedA" type="date"><input id="fCreatedB" type="date"></div></div>
+ <div class="field"><label>Modified date</label><div class="row"><input id="fModA" type="date"><input id="fModB" type="date"></div></div>
+ <div class="grid"><div class="field"><label>Min size MB</label><input id="fMin" type="number" min="0" step=".1"></div><div class="field"><label>Max size MB</label><input id="fMax" type="number" min="0" step=".1"></div></div>
+ <div class="grid"><label class="tiny muted"><input id="allDrive" type="checkbox"> Search all Drive</label><label class="tiny muted"><input id="trash" type="checkbox"> Include trash</label></div>
+ <div class="grid"><div class="field"><label>Sort</label><select id="sort"><option value="modifiedTime desc">Modified newest</option><option value="createdTime desc">Created newest</option><option value="name">Name</option><option value="quotaBytesUsed desc">Size</option></select></div><div class="field"><label>Max listed</label><input id="maxFiles" type="number" value="1000" min="1" max="100000"></div></div>
+ <button class="primary" id="listBtn" disabled>List Files</button>
+</section>
+<section class="card tiny session">
+ <h2>Session</h2><p class="muted">Access token: memory only<br>Fetched content: memory only<br>Writes to remote source: none</p>
+ <div class="toolbar"><button id="clearLoaded">Clear Loaded</button><button id="clearAll" class="danger">Disconnect + Clear</button></div>
+</section>
+</aside>
+<section class="col main">
+<section class="card browser">
+ <div class="title"><h2>Files</h2><span id="found" class="badge">0 found</span></div>
+ <div id="drivePath" class="path muted">Location: My Drive</div>
+ <div class="toolbar"><button id="upBtn" disabled>‹ Up</button><button id="rootBtn">Root</button><button id="refreshBtn" disabled>Refresh</button></div>
+ <div class="toolbar"><button id="selectVisible">Select visible</button><button id="selectAll">Select all</button><button id="selectNone">Clear</button></div>
+ <div id="files" class="list"><div class="empty">Connect Drive or choose local files.</div></div>
+</section>
+<section class="card decode">
+ <div class="title"><h2>Fetch + Decode</h2><span id="selectedCount" class="badge">0 selected</span></div>
+ <div class="row"><div class="field"><label>Concurrency</label><select id="concurrency"><option>2</option><option selected>6</option><option>10</option></select></div><button id="fetchBtn" class="primary" disabled>Fetch + Decode Selected</button></div>
+ <div class="prog"><div id="bar"></div></div><div id="decodeStats" class="summary"><span class="badge">0 decoded</span></div>
+</section>
+</section>
+<aside class="col side">
+<section class="card search">
+ <div class="title"><h2>Search inside content</h2><span id="searchable" class="badge">0 searchable</span></div>
+ <div class="field"><label>Query</label><input id="query" placeholder="swarm, system prompt, …"></div>
+ <div class="grid"><div class="field"><label>Mode</label><select id="mode"><option value="contains">Contains text</option><option value="phrase">Exact phrase</option><option value="all">All words</option><option value="any">Any words</option><option value="regex">Regular expression</option></select></div><div class="field"><label>Decoder</label><select id="decoder"><option value="">All decoded</option><option value="ai-studio-chat">AI Studio chat</option><option value="json">Generic JSON</option><option value="text">Text</option></select></div></div>
+ <div class="field"><label>Section/internal date; generic files use modified date</label><div class="row"><input id="sDateA" type="date"><input id="sDateB" type="date"></div></div>
+ <div class="note">
+  <label><input id="kUser" type="checkbox" checked> User</label> &nbsp;<label><input id="kAssistant" type="checkbox" checked> Assistant</label> &nbsp;<label><input id="kThought" type="checkbox" checked> Thoughts</label><br>
+  <label><input id="kContent" type="checkbox" checked> Document text</label> &nbsp;<label><input id="kSystem" type="checkbox"> System</label> &nbsp;<label><input id="kSettings" type="checkbox"> Settings</label><br>
+  <label><input id="ignoreCase" type="checkbox" checked> Ignore case</label> &nbsp;<label><input id="rawSearch" type="checkbox"> Raw source</label>
+ </div>
+ <div class="toolbar"><button id="searchBtn" class="primary">Search</button><button id="clearResults">Clear</button><button id="exportTxt">Export TXT</button><button id="exportJson">Export JSON</button></div>
+</section>
+<section class="card resultPanel"><div class="title"><h2>Results</h2><span id="resultStat" class="badge">0 matches</span></div><div id="results"><div class="empty">Decode files, then search inside them.</div></div></section>
+</aside>
+</main>
+<div id="sticky" class="sticky"><span id="stickyText">0 selected</span><button id="stickyFetch" class="primary">Fetch + Decode</button></div>
+<div id="modal" class="modal"><div class="dialog">
+ <div class="dialogHead"><div><strong id="modalTitle"></strong><div id="modalSub" class="tiny muted"></div></div><button id="closeModal">Close</button></div>
+ <div class="tabs"><button data-tab="content" class="on">Content</button><button data-tab="info">Info</button><button data-tab="raw">Raw</button></div><div id="modalView" class="view"></div>
+</div></div>
+<script>
+(()=>{'use strict';
+const $=id=>document.getElementById(id),G='application/vnd.google-apps.',FOLDER=G+'folder',RO='https://www.googleapis.com/auth/drive.readonly';
+const state={token:'',tokenClient:null,connected:false,source:'drive',path:[{id:'root',name:'My Drive'}],files:[],shown:[],selected:new Set,raw:new Map,docs:new Map,results:[],busy:false,stopped:false};
+const names='connBadge loadedBadge hitBadge scopeBadge source clientId scope remember connect disconnect driveAuth driveForm localAuth pickFiles pickFolder fileInput folderInput fName fExt fMime fCreatedA fCreatedB fModA fModB fMin fMax allDrive trash sort maxFiles listBtn resetFilters clearLoaded clearAll drivePath upBtn rootBtn refreshBtn selectVisible selectAll selectNone files found selectedCount fetchBtn sticky stickyText stickyFetch concurrency bar decodeStats searchable query mode decoder sDateA sDateB kUser kAssistant kThought kContent kSystem kSettings ignoreCase rawSearch searchBtn clearResults exportTxt exportJson resultStat results scopeMsg modal modalTitle modalSub modalView closeModal'.split(' '),e={};names.forEach(x=>e[x]=$(x));
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])), rx=s=>s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+const size=n=>n==null?'—':n<1024?`${n} B`:n<1048576?`${(n/1024).toFixed(1)} KB`:`${(n/1048576).toFixed(1)} MB`, date=v=>v?new Date(v).toLocaleString():'—';
+const extension=n=>(String(n).match(/\.([^.\/]+)$/)||[])[1]?.toLowerCase()||'', qesc=s=>String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+const start=d=>d?d+'T00:00:00':null, after=d=>{if(!d)return null;let x=new Date(d+'T00:00:00Z');x.setUTCDate(x.getUTCDate()+1);return x.toISOString().slice(0,10)+'T00:00:00'};
+function badge(x,t,k=''){x.textContent=t;x.className='badge'+(k?' '+k:'')}
+function note(t,k=''){e.scopeMsg.textContent=t;e.scopeMsg.style.color=k==='bad'?'var(--bad)':k==='warn'?'var(--warn)':''}
+function cfg(){let c=localStorage.getItem('fi_clientId');if(c){e.clientId.value=c;e.remember.checked=true}scopeChanged()}
+function scopeChanged(){let a=e.scope.value.trim().split(/\s+/).filter(Boolean),ro=a.length===1&&a[0]===RO;if(ro){badge(e.scopeBadge,'READ ONLY','ok');note('Read-only: may list and download accessible Drive files; this page contains no Drive write actions.')}else{badge(e.scopeBadge,'CUSTOM SCOPE','warn');note('Custom scope requested. Its permissions depend on what you entered; verify it before authorizing.','warn')}}
+function sourceChanged(){state.source=e.source.value;let d=state.source==='drive';e.driveAuth.classList.toggle('hide',!d);e.localAuth.classList.toggle('hide',d);e.listBtn.disabled=d&&!state.connected;e.refreshBtn.disabled=d&&!state.connected;renderFiles()}
+function connect(){
+ let cid=e.clientId.value.trim(),scope=e.scope.value.trim()||RO;if(!cid)return note('Enter an OAuth Client ID first.','bad');
+ if(!window.google?.accounts?.oauth2)return note('Google authorization library is not ready yet. Try again in a moment.','warn');
+ if(e.remember.checked)localStorage.setItem('fi_clientId',cid);else localStorage.removeItem('fi_clientId');
+ state.tokenClient=google.accounts.oauth2.initTokenClient({client_id:cid,scope,callback:r=>{
+  if(r.error)return note('Authorization failed: '+r.error,'bad');
+  state.token=r.access_token;state.connected=true;badge(e.connBadge,'Drive · connected','ok');e.connect.disabled=true;e.disconnect.disabled=false;e.listBtn.disabled=false;e.refreshBtn.disabled=false;note('Connected. Token is held only in this page memory.');listFiles();
+ }});
+ state.tokenClient.requestAccessToken({prompt:'select_account'});
+}
+function disconnect(clear=false){if(state.token&&window.google?.accounts?.oauth2)google.accounts.oauth2.revoke(state.token,()=>{});state.token='';state.connected=false;state.tokenClient=null;e.connect.disabled=false;e.disconnect.disabled=true;e.listBtn.disabled=state.source==='drive';e.refreshBtn.disabled=state.source==='drive';badge(e.connBadge,'Disconnected');note('Disconnected.');if(clear)clearLoaded(true)}
+async function api(url,opt={}){let r=await fetch(url,{...opt,headers:{...(opt.headers||{}),Authorization:'Bearer '+state.token}});if(r.status===401){disconnect();throw Error('Authorization expired. Connect again.')}if(!r.ok)throw Error(`${r.status} ${(await r.text()).slice(0,160)}`);return r}
+function driveQuery(){
+ let a=[];if(!e.trash.checked)a.push('trashed = false');if(!e.allDrive.checked)a.push(`'${qesc(state.path.at(-1).id)}' in parents`);
+ let n=e.fName.value.trim();if(n)a.push(`name contains '${qesc(n)}'`);
+ [['fCreatedA','createdTime'],['fModA','modifiedTime']].forEach(([id,f])=>{let v=start(e[id].value);if(v)a.push(`${f} >= '${v}'`)});
+ [['fCreatedB','createdTime'],['fModB','modifiedTime']].forEach(([id,f])=>{let v=after(e[id].value);if(v)a.push(`${f} < '${v}'`)});
+ return a.join(' and ');
+}
+function filter(f){
+ if(f.mimeType===FOLDER)return true;
+ let n=e.fName.value.trim().toLowerCase(), ex=e.fExt.value.trim().toLowerCase(), mi=e.fMime.value.trim().toLowerCase(), mb=+(f.size||0)/1048576, min=+e.fMin.value||0,max=+e.fMax.value||0;
+ if(n&&!f.name.toLowerCase().includes(n)||mi&&!String(f.mimeType).toLowerCase().includes(mi)||min&&mb<min||max&&mb>max)return false;
+ if(ex){let x=extension(f.name),allowed=ex.split(/[, ]+/).filter(Boolean);if(!allowed.some(a=>a==='noext'?!x:a.replace(/^\./,'')===x))return false}
+ for(let [lo,hi,field] of [['fCreatedA','fCreatedB','createdTime'],['fModA','fModB','modifiedTime']]){let d=(f[field]||'').slice(0,10);if(e[lo].value&&d<e[lo].value||e[hi].value&&d>e[hi].value)return false}
+ return true;
+}
+async function listFiles(){
+ if(state.source==='local'){state.shown=state.files.filter(filter);renderFiles();return}
+ if(!state.connected)return; e.files.innerHTML='<div class="empty">Listing metadata…</div>';state.files=[];state.selected.clear();selection();
+ try{
+  let p='',limit=Math.max(1,Math.min(100000,+e.maxFiles.value||1000)),q=driveQuery();
+  do{let u=new URL('https://www.googleapis.com/drive/v3/files');u.searchParams.set('q',q);u.searchParams.set('pageSize',String(Math.min(1000,limit-state.files.length)));u.searchParams.set('orderBy',e.sort.value);u.searchParams.set('fields','nextPageToken,files(id,name,mimeType,size,createdTime,modifiedTime,parents,webViewLink)');u.searchParams.set('spaces','drive');if(p)u.searchParams.set('pageToken',p);let j=await(await api(u)).json();state.files.push(...(j.files||[]));p=j.nextPageToken||''}while(p&&state.files.length<limit);
+  state.shown=state.files.filter(filter);renderFiles();note(`Listed ${state.shown.length} matching items${state.files.length>=limit?' (limit reached)':''}.`);
+ }catch(err){e.files.innerHTML='<div class="empty">'+esc(err.message)+'</div>';note('List failed: '+err.message,'bad')}
+}
+function local(files){state.source='local';e.source.value='local';sourceChanged();state.path=[{id:'local',name:'Local selection'}];state.files=[...files].map((f,i)=>({id:'local:'+i+':'+f.name,name:f.webkitRelativePath||f.name,mimeType:f.type||'application/octet-stream',size:f.size,createdTime:new Date(f.lastModified).toISOString(),modifiedTime:new Date(f.lastModified).toISOString(),localFile:f}));state.shown=state.files.filter(filter);state.selected=new Set(state.shown.map(f=>f.id));renderFiles();selection();note(`Loaded metadata for ${state.files.length} local files.`)}
+function path(){let a=state.path.map((x,i)=>`<span class="${i===state.path.length-1?'cur':''}">${esc(x.name)}</span>`).join('<b>/</b>');e.drivePath.innerHTML='<small>LOCATION</small>'+a;e.upBtn.disabled=state.source!=='drive'||state.path.length<2}
+function renderFiles(){
+ path();badge(e.found,`${state.shown.length} found`);if(!state.shown.length){e.files.innerHTML='<div class="empty">No files listed.</div>';return}
+ e.files.innerHTML=state.shown.map(f=>{let dir=f.mimeType===FOLDER,sel=state.selected.has(f.id),st=f.error?'failed: '+f.error:state.docs.get(f.id)?.decoder||state.raw.has(f.id)?'downloaded':'metadata';return `<div class="file ${dir?'folder':''} ${sel?'sel':''}" data-id="${esc(f.id)}">${dir?'<span class="folderI">📁</span>':`<input class="pick" type="checkbox" ${sel?'checked':''}>`}<div><div class="name">${esc(f.name)}</div><div class="meta">${dir?'Folder':(extension(f.name)||'no extension')+' · '+size(+f.size||null)} · ${esc(date(f.modifiedTime))}</div><div class="status ${state.docs.has(f.id)?'ok':f.error?'bad':''}">${esc(st)}</div></div><div class="open">${dir?'<button class="folderBtn">Open</button>':f.webViewLink?'<button class="driveBtn">Drive</button>':''}</div></div>`}).join('');
+ e.files.querySelectorAll('.file').forEach(n=>{let f=state.shown.find(x=>x.id===n.dataset.id);n.querySelector('.pick')?.addEventListener('change',x=>{x.target.checked?state.selected.add(f.id):state.selected.delete(f.id);n.classList.toggle('sel',x.target.checked);selection()});n.querySelector('.folderBtn')?.addEventListener('click',()=>{state.path.push({id:f.id,name:f.name});listFiles()});n.querySelector('.driveBtn')?.addEventListener('click',()=>open(f.webViewLink,'_blank','noopener'))});
+}
+function selection(){let n=state.selected.size;badge(e.selectedCount,`${n} selected`);e.fetchBtn.disabled=!n||state.busy;e.sticky.classList.toggle('show',innerWidth<=980&&n>0&&!state.busy);e.stickyText.textContent=`${n} selected`}
+function reset(){'fName fExt fMime fCreatedA fCreatedB fModA fModB fMin fMax'.split(' ').forEach(x=>e[x].value='');e.allDrive.checked=e.trash.checked=false;e.sort.value='modifiedTime desc';e.maxFiles.value=1000}
+function picked(){return state.shown.filter(f=>state.selected.has(f.id)&&f.mimeType!==FOLDER)}
+function expMime(m){return m===G+'document'?'text/plain':m===G+'spreadsheet'?'text/csv':m===G+'presentation'?'text/plain':m===G+'script'?'application/vnd.google-apps.script+json':''}
+function textish(f,ct,b){let s=(ct+' '+f.name).toLowerCase();if(/text\/|json|javascript|xml|csv|html|markdown|css/.test(s))return true;let t=new TextDecoder().decode(b.slice(0,512)).trimStart();if(t[0]==='{'||t[0]==='[')return true;let bad=0;for(let c of b.slice(0,512))if(c===0||c<9||c>13&&c<32)bad++;return bad<3}
+async function body(f){
+ if(f.localFile)return {text:await f.localFile.text(),type:f.mimeType,bytes:f.size};
+ let ex=expMime(f.mimeType),url;if(f.mimeType.startsWith(G)){if(!ex)throw Error('Unsupported Workspace export');url=`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(f.id)}/export?mimeType=${encodeURIComponent(ex)}`}else url=`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(f.id)}?alt=media`;
+ let r=await api(url),b=new Uint8Array(await r.arrayBuffer()),ct=r.headers.get('content-type')||f.mimeType;if(!textish(f,ct,b))throw Error('Unsupported binary content');return {text:new TextDecoder().decode(b),type:ct,bytes:b.length};
+}
+function flat(v,out=[],p=''){if(typeof v==='string'){if(p.split('.').at(-1)!=='thoughtSignature'&&v.trim())out.push({label:p,text:v})}else if(Array.isArray(v))v.forEach((x,i)=>flat(x,out,`${p}[${i}]`));else if(v&&typeof v==='object')Object.entries(v).forEach(([k,x])=>{if(k!=='thoughtSignature')flat(x,out,p?p+'.'+k:k)});return out}
+function sig(s){try{let b=Uint8Array.from(atob(s),c=>c.charCodeAt(0)),i=0,vi=()=>{let v=0,n=0,c;do{c=b[i++];v+=(c&127)*2**(7*n++)}while(c&128&&i<b.length);return v},tag=b[i++],outer=vi(),tag2=b[i++],payload=vi();return {base64Chars:s.length,bytes:b.length,outerField:tag>>3,outerBytes:outer,innerField:tag2>>3,payloadBytes:payload,prefix:[...b.slice(i,i+16)].map(x=>x.toString(16).padStart(2,'0')).join(' ')}}catch(_){return {base64Chars:s.length,error:'Invalid Base64'}}}
+function span(a){let t=a.map(x=>x.time).filter(Boolean).sort();return t.length?[t[0],t.at(-1)]:[]}
+function decode(f,r){
+ let t=r.text,j=null,z=t.trim();if(z[0]==='{'||z[0]==='[')try{j=JSON.parse(t)}catch(_){}
+ if(j&&Array.isArray(j?.chunkedPrompt?.chunks)){let s=[],signatures=[],sys=flat(j.systemInstruction||{}).map(x=>x.text).join('\n');if(sys)s.push({kind:'system',text:sys,label:'System instruction'});if(j.runSettings)s.push({kind:'settings',text:JSON.stringify(j.runSettings,null,2),label:'Run settings'});
+  j.chunkedPrompt.chunks.forEach((c,i)=>{let tx=c.text||((c.parts||[]).map(p=>p.text||'').join('')),k=c.isThought?'thought':c.role==='user'?'user':'assistant';if(tx)s.push({kind:k,label:k+' '+(i+1),text:tx,time:c.createTime||'',tokens:c.tokenCount||0});(c.parts||[]).forEach(p=>p.thoughtSignature&&signatures.push(sig(p.thoughtSignature)))});
+  return {id:f.id,name:f.name,decoder:'ai-studio-chat',title:'AI Studio chat',meta:f,raw:t,sections:s,model:j.runSettings?.model||'',signatures,span:span(s)};
+ }
+ if(j)return {id:f.id,name:f.name,decoder:'json',title:'Generic JSON',meta:f,raw:t,sections:flat(j).map(x=>({kind:'content',label:x.label,text:x.text})),span:[]};
+ let text=t;if(/html/i.test(r.type)||/<(?:html|body|div|p|article)\b/i.test(t.slice(0,500)))try{text=new DOMParser().parseFromString(t,'text/html').body.textContent||t}catch(_){}
+ return {id:f.id,name:f.name,decoder:'text',title:'Text',meta:f,raw:t,sections:[{kind:'content',label:'Text content',text}],span:[]};
+}
+async function fetchDecode(){
+ let jobs=picked();if(!jobs.length)return;state.busy=true;let done=0,ok=0,fail=0,i=0,n=Math.max(1,+e.concurrency.value||6);
+ function prog(){e.bar.style.width=`${done/jobs.length*100}%`;e.decodeStats.innerHTML=`<span class="badge">${done}/${jobs.length} downloaded</span><span class="badge ok">${ok} decoded</span><span class="badge ${fail?'bad':''}">${fail} failed</span>`}
+ async function worker(){while(i<jobs.length){let f=jobs[i++];try{let r=await body(f);state.raw.set(f.id,r);state.docs.set(f.id,decode(f,r));delete f.error;ok++}catch(err){f.error=err.message;fail++}done++;prog()}}
+ await Promise.all(Array.from({length:Math.min(n,jobs.length)},worker));state.busy=false;renderFiles();selection();decoded();note(`Decoded ${ok} file(s); ${fail} failed.`,fail?'warn':'')
+}
+function decoded(){let a=[...state.docs.values()],c={};a.forEach(x=>c[x.decoder]=(c[x.decoder]||0)+1);badge(e.loadedBadge,`${a.length} decoded`,a.length?'ok':'');badge(e.searchable,`${a.filter(x=>x.sections.length).length} searchable`);e.decodeStats.innerHTML=Object.entries(c).map(([k,v])=>`<span class="badge ok">${v} ${esc(k)}</span>`).join('')||'<span class="badge">0 decoded</span>'}
+function kind(k){return ({user:e.kUser,assistant:e.kAssistant,thought:e.kThought,content:e.kContent,system:e.kSystem,settings:e.kSettings}[k]||e.kContent).checked}
+function dated(s,d){let a=e.sDateA.value,b=e.sDateB.value;if(!a&&!b)return true;let x=(s.time||d.meta.modifiedTime||'').slice(0,10);return !!x&&(!a||x>=a)&&(!b||x<=b)}
+function matcher(q){let ic=e.ignoreCase.checked,m=e.mode.value,x=ic?q.toLowerCase():q,w=x.trim().split(/\s+/).filter(Boolean);if(m==='regex'){let r;try{r=new RegExp(q,ic?'gi':'g')}catch(err){throw Error('Invalid regular expression: '+err.message)}return t=>(t.match(r)||[]).length}return t=>{let a=ic?t.toLowerCase():t;if(m==='all')return w.every(v=>a.includes(v))?w.reduce((n,v)=>n+a.split(v).length-1,0):0;if(m==='any')return w.reduce((n,v)=>n+a.split(v).length-1,0);return x?a.split(x).length-1:0}}
+function snip(t,q){let i=e.ignoreCase.checked?t.toLowerCase().indexOf(q.toLowerCase()):t.indexOf(q),p=Math.max(0,(i<0?0:i)-85),s=t.slice(p,p+255),h=esc(s);if(q&&e.mode.value!=='regex')h=h.replace(new RegExp(rx(esc(q)),'gi'),x=>`<mark>${x}</mark>`);return(p?'…':'')+h+(p+255<t.length?'…':'')}
+function search(){
+ let q=e.query.value.trim();if(!q){state.results=[];results();return}let fn;try{fn=matcher(q)}catch(err){return note(err.message,'bad')}let dec=e.decoder.value,a=[];
+ state.docs.forEach(d=>{if(dec&&d.decoder!==dec)return;let sections=d.sections.filter(s=>kind(s.kind)&&dated(s,d));if(e.rawSearch.checked)sections.push({kind:'raw',label:'Raw source',text:d.raw});let hits=[];sections.forEach(s=>{let n=fn(s.text);if(n)hits.push({...s,count:n,snip:snip(s.text,q)})});if(hits.length)a.push({doc:d,hits,count:hits.reduce((n,x)=>n+x.count,0)})});
+ state.results=a.sort((a,b)=>b.count-a.count);results();
+}
+function results(){
+ let n=state.results.reduce((a,x)=>a+x.hits.length,0);badge(e.resultStat,`${state.results.length} files · ${n} sections`,state.results.length?'ok':'');badge(e.hitBadge,`${n} hits`,n?'ok':'');
+ if(!state.results.length){e.results.innerHTML='<div class="empty">No matching decoded content.</div>';return}
+ e.results.innerHTML=state.results.map((r,i)=>`<div class="result"><div class="head"><div><strong>${esc(r.doc.name)}</strong><div class="tiny muted">${esc(r.doc.title)}${r.doc.model?' · '+esc(r.doc.model.replace('models/','')):''}</div></div><span class="badge ok">${r.count} hits</span></div>${r.hits.slice(0,2).map(h=>`<div class="snippet"><span class="tiny muted">${esc(h.kind.toUpperCase())}${h.time?' · '+esc(date(h.time)):''}</span><br>${h.snip}</div>`).join('')}<div class="toolbar"><button data-view="${i}">View content</button>${r.doc.meta.webViewLink?`<button data-drive="${i}">Drive</button>`:''}</div></div>`).join('');
+ e.results.querySelectorAll('[data-view]').forEach(x=>x.onclick=()=>openDoc(state.results[+x.dataset.view].doc));e.results.querySelectorAll('[data-drive]').forEach(x=>x.onclick=()=>open(state.results[+x.dataset.drive].doc.meta.webViewLink,'_blank','noopener'));
+}
+let opened=null,tab='content';
+function openDoc(d){opened=d;tab='content';e.modal.classList.add('show');e.modalTitle.textContent=d.name;e.modalSub.textContent=d.title+(d.model?' · '+d.model:'');modal()}
+function modal(){document.querySelectorAll('.tabs button').forEach(x=>x.classList.toggle('on',x.dataset.tab===tab));let d=opened;if(!d)return;if(tab==='raw')return e.modalView.textContent=d.raw;if(tab==='info'){let t=`Decoder: ${d.title}\nDrive MIME: ${d.meta.mimeType||'—'}\nSize: ${size(+d.meta.size||null)}\nModified: ${date(d.meta.modifiedTime)}\nModel: ${d.model||'—'}\nSections: ${d.sections.length}\nDate span: ${d.span.length?d.span.map(date).join(' → '):'—'}\nSignatures: ${d.signatures?.length||0}`;if(d.signatures?.length)t+='\n\n'+d.signatures.map((s,i)=>`Signature ${i+1}\nBase64 chars: ${s.base64Chars}\nDecoded bytes: ${s.bytes||'—'}\nPayload bytes: ${s.payloadBytes||'—'}\nReadable plaintext: no\nPrefix: ${s.prefix||'—'}`).join('\n\n');return e.modalView.textContent=t}e.modalView.innerHTML=d.sections.map(s=>`<div class="msg ${esc(s.kind)}"><div class="who">${esc(s.kind.toUpperCase())}${s.time?' · '+esc(date(s.time)):''}${s.tokens?' · '+s.tokens+' tokens':''}</div>${esc(s.text)}</div>`).join('')}
+function jsonReport(){return state.results.map(r=>({file:{name:r.doc.name,decoder:r.doc.decoder,model:r.doc.model||'',modifiedTime:r.doc.meta.modifiedTime||'',span:r.doc.span},hits:r.hits.map(h=>({kind:h.kind,time:h.time||'',count:h.count,text:h.text}))}))}
+function dl(n,t,m){let a=document.createElement('a');a.href=URL.createObjectURL(new Blob([t],{type:m}));a.download=n;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),500)}
+function textReport(){let t=`SEARCH REPORT\nQuery: ${e.query.value}\nGenerated: ${new Date().toISOString()}\nFiles matched: ${state.results.length}\n\n`;state.results.forEach(r=>{t+=`==================================================\nFILE: ${r.doc.name}\nDECODER: ${r.doc.title}\nMODEL: ${r.doc.model||'—'}\nMATCHES: ${r.count}\n\n`;r.hits.forEach(h=>t+=`[${h.kind.toUpperCase()}${h.time?' · '+h.time:''}]\n${h.text}\n\n`)});dl('search_report.txt',t,'text/plain')}
+function clearLoaded(files=false){state.raw.clear();state.docs.clear();state.results=[];if(files){state.files=[];state.shown=[];state.selected.clear();renderFiles();selection()}decoded();results();e.bar.style.width='0'}
+function bind(){
+ e.scope.oninput=scopeChanged;e.source.onchange=sourceChanged;e.driveForm.onsubmit=x=>{x.preventDefault();connect()};e.disconnect.onclick=()=>disconnect();e.pickFiles.onclick=()=>e.fileInput.click();e.pickFolder.onclick=()=>e.folderInput.click();e.fileInput.onchange=x=>local(x.target.files);e.folderInput.onchange=x=>local(x.target.files);e.listBtn.onclick=listFiles;e.refreshBtn.onclick=listFiles;e.rootBtn.onclick=()=>{state.path=[{id:'root',name:'My Drive'}];listFiles()};e.upBtn.onclick=()=>{if(state.path.length>1){state.path.pop();listFiles()}};
+ e.resetFilters.onclick=reset;e.selectVisible.onclick=()=>{state.shown.filter(f=>f.mimeType!==FOLDER).forEach(f=>state.selected.add(f.id));renderFiles();selection()};e.selectAll.onclick=e.selectVisible.onclick;e.selectNone.onclick=()=>{state.selected.clear();renderFiles();selection()};e.fetchBtn.onclick=fetchDecode;e.stickyFetch.onclick=fetchDecode;e.searchBtn.onclick=search;e.query.onkeydown=x=>x.key==='Enter'&&search();e.clearResults.onclick=()=>{state.results=[];results()};e.exportTxt.onclick=textReport;e.exportJson.onclick=()=>dl('search_report.json',JSON.stringify(jsonReport(),null,2),'application/json');e.clearLoaded.onclick=()=>clearLoaded();e.clearAll.onclick=()=>{disconnect();clearLoaded(true)};e.closeModal.onclick=()=>e.modal.classList.remove('show');e.modal.onclick=x=>x.target===e.modal&&e.modal.classList.remove('show');document.querySelectorAll('.tabs button').forEach(x=>x.onclick=()=>{tab=x.dataset.tab;modal()});
+}
+window.__FILE_INSPECTOR_TEST__={decode,flat,sig,matcher,state,local,search,listFiles,filter};
+bind();cfg();sourceChanged();decoded();results();
+})();
+</script>
+</body>
+</html>
