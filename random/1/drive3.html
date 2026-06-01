@@ -1,0 +1,880 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,interactive-widget=resizes-content">
+<title>Drive Lens · Hardened Virtual Search</title>
+<style>
+:root{
+ --bg:#09111e;--panel:#101b30;--deep:#0b1427;--line:#263a58;--text:#e7eefb;--muted:#91a4bf;
+ --accent:#60a5fa;--violet:#a78bfa;--pink:#f472b6;--good:#4adea3;--warn:#facc55;--bad:#fb7185;
+ --rad:14px;--rowh:88px;--resh:190px;--safe-t:env(safe-area-inset-top,0px);--safe-r:env(safe-area-inset-right,0px);--safe-b:env(safe-area-inset-bottom,0px);--safe-l:env(safe-area-inset-left,0px)
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--text);font:14px system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+body{min-block-size:100dvh;max-inline-size:100dvw;overflow-x:hidden;padding-bottom:calc(68px + var(--safe-b))}
+button,input,select{font:inherit;color:inherit}
+button{background:#172641;border:1px solid var(--line);border-radius:10px;padding:9px 11px;cursor:pointer;touch-action:manipulation}
+button:hover{border-color:var(--accent)}
+button:disabled{opacity:.42;cursor:not-allowed}
+button.main{background:linear-gradient(135deg,#377de4,#7761e8);border:0;font-weight:700}
+button.ghost{background:transparent}
+input,select{width:100%;background:#07101f;border:1px solid var(--line);border-radius:10px;padding:10px;outline:none}
+input:focus,select:focus{border-color:var(--accent)}
+input[type=checkbox]{width:auto;accent-color:var(--accent)}
+h1{font-size:clamp(29px,7dvw,47px);line-height:1;margin:0;background:linear-gradient(120deg,var(--accent),var(--violet),var(--pink));color:transparent;background-clip:text;-webkit-background-clip:text}
+h2{font-size:15px;margin:0}
+.wrap{inline-size:min(1110px,100dvw);max-inline-size:100%;margin:auto;padding:max(12px,var(--safe-t)) max(12px,var(--safe-r)) 12px max(12px,var(--safe-l))}
+.hero{text-align:center;padding:18px 7px 13px}
+.hero p,.tiny{color:var(--muted);font-size:12px;margin:8px 0}
+.badges,.buttons,.chips{display:flex;gap:7px;flex-wrap:wrap}
+.badges{justify-content:center}
+.badge{font-size:12px;border:1px solid var(--line);background:var(--panel);border-radius:99px;padding:4px 9px;color:var(--muted);white-space:nowrap}
+.badge.ok{color:var(--good);border-color:#245f48}
+.badge.warn{color:var(--warn);border-color:#654d22}
+.badge.bad{color:var(--bad);border-color:#6e3041}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--rad);margin:10px 0;padding:12px}
+.phead{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:9px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.grid.single{grid-template-columns:1fr}
+.field{margin:7px 0}
+.field label{display:block;color:var(--muted);font-size:12px;margin-bottom:4px}
+.row{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.row>*{flex:1}
+.row>button,.row>.badge{flex:none}
+.note{font-size:12px;color:var(--muted);background:var(--deep);border-radius:10px;padding:8px 10px;margin-top:9px;line-height:1.45}
+.note.warn{color:var(--warn)}
+.note.bad{color:var(--bad)}
+.hide{display:none!important}
+details.panel{padding:0}
+summary{padding:12px;cursor:pointer;list-style:none;font-weight:650;display:flex;justify-content:space-between;align-items:center}
+summary::-webkit-details-marker{display:none}
+summary:after{content:"＋";color:var(--muted)}
+details[open]>summary:after{content:"−"}
+details>.body{padding:0 12px 12px}
+.browser{padding:0;overflow:hidden}
+.bar{padding:12px;border-bottom:1px solid var(--line)}
+.path{font-weight:600;color:#d2e4ff;margin-bottom:9px;word-break:break-word}
+.browse-grid{display:grid;grid-template-columns:1fr 106px 1fr;gap:7px;margin-top:10px}
+.checkline{font-size:12px;color:var(--muted);display:flex;gap:12px;flex-wrap:wrap;margin-top:8px}
+.chip{display:inline-flex;gap:5px;align-items:center;font-size:12px;border:1px solid #344c73;background:#172641;border-radius:99px;padding:5px 8px;margin-top:8px}
+.chip button{padding:0 3px;border:0;background:none;color:var(--muted)}
+.entries{block-size:min(62dvh,670px);overflow:auto;position:relative;background:#0d172b}
+.space{position:relative;min-height:100%}
+.vrow{position:absolute;left:8px;right:8px;height:calc(var(--rowh) - 7px);display:grid;grid-template-columns:auto auto minmax(0,1fr) auto;align-items:center;gap:9px;background:#142139;border:1px solid #263954;border-radius:13px;padding:10px}
+.vrow.folder{background:linear-gradient(90deg,#182946,#142139);border-color:#334e77;cursor:pointer}
+.vrow.more{display:block;text-align:center;padding:27px 8px;color:var(--muted);border-style:dashed}
+.num{width:32px;text-align:right;color:var(--muted);font-size:12px}
+.icon{font-size:20px}
+.ename{font-size:15px;font-weight:650;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.folder .ename{color:var(--warn)}
+.meta,.status{font-size:12px;color:var(--muted);margin-top:3px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.status.ok{color:var(--good)}
+.status.bad{color:var(--bad)}
+.status.warn{color:var(--warn)}
+.smallbtn{padding:7px 9px;font-size:12px}
+.selectbar{padding:11px 12px;border-top:1px solid var(--line);background:#0d182d}
+.progress{height:7px;border-radius:8px;background:#07101e;overflow:hidden;margin:9px 0}
+.progress i{display:block;width:0;height:100%;background:linear-gradient(90deg,var(--accent),var(--violet));transition:width .12s linear}
+.progress i.run{width:36%;animation:run 1s ease-in-out infinite alternate}
+@keyframes run{from{transform:translateX(-70%)}to{transform:translateX(260%)}}
+.options{font-size:12px;color:var(--muted);line-height:2;background:var(--deep);padding:7px 9px;border-radius:10px;margin:8px 0}
+.results-viewport{block-size:min(58dvh,610px);overflow:auto;position:relative;background:#0d172b;border-radius:11px;overscroll-behavior:contain;touch-action:pan-y;-webkit-overflow-scrolling:touch;contain:layout paint style}
+.results-space{position:relative;min-height:100%}
+.result{position:absolute;left:7px;right:7px;height:calc(var(--resh) - 8px);background:#142139;border:1px solid var(--line);border-radius:12px;padding:10px;overflow:hidden}
+.result-top{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}.result-top>div{flex:1;min-width:0}.result-top>.badge{flex:none}
+.result-title{font-weight:650;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.snip{white-space:pre-wrap;word-break:break-word;background:#0a1324;border-radius:9px;margin-top:7px;padding:8px;font-size:13px;line-height:1.32;height:59px;overflow:hidden}
+.snip mark{background:#594616;color:#ffed9b;border-radius:3px}
+.empty{text-align:center;color:var(--muted);padding:23px 12px}
+.sticky{display:none;position:fixed;inset-inline:0;bottom:0;max-inline-size:100dvw;z-index:5;padding:9px max(12px,var(--safe-r)) calc(9px + var(--safe-b)) max(12px,var(--safe-l));background:#0c1527f5;border-top:1px solid var(--line);align-items:center;justify-content:space-between;gap:8px}
+.sticky.show{display:flex}
+.modal{display:none;position:fixed;inset:0;inline-size:100dvw;block-size:100dvh;background:#040912e5;z-index:9;padding:max(8px,var(--safe-t)) max(8px,var(--safe-r)) max(8px,var(--safe-b)) max(8px,var(--safe-l))}
+.modal.show{display:flex}
+.dialog{inline-size:min(920px,calc(100dvw - 16px));max-inline-size:100%;block-size:min(96dvh,calc(100dvh - 16px));max-block-size:100%;margin:auto;background:var(--panel);border:1px solid var(--line);border-radius:14px;display:flex;flex-direction:column;overflow:hidden}
+.dhead,.tabs{padding:10px 12px;border-bottom:1px solid var(--line);display:flex;gap:7px}
+.dhead{justify-content:space-between}
+.view{padding:12px;overflow:auto;white-space:pre-wrap;word-break:break-word;line-height:1.5}
+.msg{background:var(--deep);border-left:3px solid var(--accent);border-radius:11px;padding:10px;margin-bottom:10px}
+.msg.assistant{border-color:var(--good)}
+.msg.thought{border-color:var(--warn)}
+.msg.system,.msg.settings{border-color:var(--violet)}
+.who{font-size:11px;color:var(--muted);margin-bottom:5px}
+@media(min-width:910px){.work{display:grid;grid-template-columns:minmax(525px,1fr) 445px;gap:10px;align-items:start}.right{position:sticky;top:10px}.sticky.show{display:none}}
+@media(max-width:909px){.wrap{padding:max(10px,var(--safe-t)) max(10px,var(--safe-r)) 10px max(10px,var(--safe-l))}.browse-grid{grid-template-columns:1fr 102px 1fr}.vrow{left:5px;right:5px}.results-viewport{block-size:60dvh}}@media(max-width:560px){.browse-grid{grid-template-columns:1fr 1fr}.browse-grid .field:last-child{grid-column:1/-1}}@media(max-width:420px){:root{--resh:208px}}
+</style>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+</head>
+<body>
+<div class="wrap">
+<header class="hero">
+ <h1>Drive Lens</h1>
+ <p>Virtual browse · streamed power search · local decoding</p>
+ <div class="badges"><span id="connB" class="badge">Disconnected</span><span id="metaB" class="badge">0 metadata</span><span id="memB" class="badge">cache idle</span><span id="scanB" class="badge">idle</span></div>
+</header>
+
+<details id="connection" class="panel" open><summary>Connection <span id="scopeB" class="badge ok">READ ONLY</span></summary><div class="body">
+ <div class="field"><label>Source</label><select id="source"><option value="drive">Google Drive</option><option value="local">Device / Local files</option></select></div>
+ <form id="auth" autocomplete="on">
+  <div id="driveFields">
+   <div class="field"><label>OAuth Client ID</label><input id="clientId" name="google-drive-client-id" placeholder="…apps.googleusercontent.com" autocomplete="on" autocapitalize="none" spellcheck="false"></div>
+   <div class="field"><label>Scope</label><input id="scope" value="https://www.googleapis.com/auth/drive.readonly" autocomplete="off"></div>
+   <div id="corpusGrid" class="grid single">
+    <div class="field"><label>Search corpus</label><select id="corpus"><option value="user">My Drive / user corpus</option><option value="allDrives">All accessible drives</option><option value="drive">Specific shared drive</option></select></div>
+    <div class="field" id="driveIdField"><label>Shared Drive ID</label><input id="driveId" placeholder="required for specific drive"></div>
+   </div>
+   <label class="tiny"><input id="remember" type="checkbox"> Remember Client ID locally</label>
+   <div class="buttons"><button class="main" type="submit">Connect Drive</button><button id="disconnect" type="button" disabled>Disconnect</button></div>
+   <div id="scopeMsg" class="note">Read-only; tokens and downloaded content stay in page memory.</div>
+   <p class="tiny">How to: Send source code of this html to an ai and tell what you wanna use it for and how.</p>
+  </div>
+ </form>
+ <div id="localFields" class="hide">
+  <div class="buttons"><button id="deviceFolder" class="main">Open Device Folder · live</button><button id="pickFolder">Import Folder Snapshot</button><button id="pickFiles">Choose Files</button></div>
+  <div id="deviceNote" class="note">Live mode reads the selected folder lazily when supported. Snapshot fallback rebuilds navigation from selected file paths.</div>
+  <input id="fileInput" class="hide" type="file" multiple><input id="folderInput" class="hide" type="file" webkitdirectory directory multiple>
+ </div>
+</div></details>
+
+<div class="work"><div>
+<details class="panel"><summary>Metadata filters & browsing <span id="filterB" class="badge">none</span></summary><div class="body">
+ <div class="field"><label>Name contains · Drive query</label><input id="fName" placeholder="chat, architecture…"></div>
+ <div class="grid"><div class="field"><label>Extensions · local post-filter</label><input id="fExt" placeholder="json, txt, noext"></div><div class="field"><label>MIME equals · Drive query</label><input id="fMime" placeholder="application/json"></div></div>
+ <div class="field"><label>Modified date · Drive query</label><div class="row"><input id="fFrom" type="date"><input id="fTo" type="date"></div></div>
+ <div class="grid"><div class="field"><label>Min MB · local post-filter</label><input id="fMin" type="number" min="0" step=".1"></div><div class="field"><label>Max MB · local post-filter</label><input id="fMax" type="number" min="0" step=".1"></div></div>
+ <div class="field"><label>Optional Drive-indexed fullText prefilter · can miss files not indexed by Drive</label><input id="fullText" placeholder="leave empty for direct content scan"></div>
+ <div class="grid">
+  <div class="field"><label>Items shown</label><select id="itemType"><option value="all">Files and folders</option><option value="files">Files only</option><option value="folders">Folders only</option></select></div>
+  <div class="field"><label>Presentation</label><select id="arrange"><option value="api">API returned order</option><option value="folders">Folders first · optional</option><option value="files">Files first · optional</option></select></div>
+ </div>
+ <div class="grid">
+  <div class="field"><label>Drive orderBy</label><select id="order"><option value="">Unspecified</option><option value="name_natural">Name natural</option><option value="modifiedTime desc">Modified newest</option><option value="createdTime desc">Created newest</option><option value="recency desc">Recent activity</option><option value="viewedByMeTime desc">Viewed newest</option></select></div>
+  <div class="field"><label>Visited views cached</label><input id="cacheViews" type="number" min="1" max="30" value="4"></div>
+ </div>
+ <div class="grid">
+  <div class="field"><label>Inactive metadata cache budget · rows</label><input id="cacheRows" type="number" min="1000" value="100000"></div>
+  <div class="field"><label>Records per batch · Drive / device</label><input id="apiPage" type="number" min="1" max="1000" value="1000"></div>
+ </div>
+ <label class="tiny"><input id="trash" type="checkbox"> Include trash</label>
+ <div class="buttons"><button id="apply" class="main">Apply / restart view</button><button id="clearFilters">Clear filters</button><button id="clearCache">Clear inactive cache</button></div>
+ <div class="field"><label>Saved setup · stores filters/search settings only, never OAuth credentials</label><select id="preset"><option value="">— none —</option></select></div>
+ <div class="buttons"><button id="savePreset">Save setup</button><button id="loadPreset">Load</button><button id="deletePreset">Delete</button><button id="exportSetup">Export JSON</button><button id="importSetup">Import JSON</button></div>
+ <input id="setupFile" class="hide" type="file" accept="application/json,.json">
+</div></details>
+
+<section class="panel browser">
+ <div class="bar">
+  <div id="path" class="path">My Drive</div>
+  <div class="buttons"><button id="back" disabled>‹ Back</button><button id="root">Root</button><button id="target">+ Target folder</button></div>
+  <div id="targets" class="chips"></div>
+  <div class="browse-grid">
+   <div class="field"><label>Browse area</label><select id="browseArea"><option value="folder">Looking folder</option><option value="corpus">Selected corpus</option></select></div>
+   <div class="field"><label>Prefetch</label><select id="prefetch"><option value="smooth">Smooth</option><option value="low">Low data</option><option value="off">Manual</option></select></div>
+   <div class="field"><label>Rows before prefetch</label><input id="ahead" type="number" min="0" value="400"></div>
+  </div>
+  <div class="checkline"><label><input id="folders" type="checkbox" checked> Show folder rows</label><span id="networkNote">First page waits for Drive; later pages are prefetched ahead of scrolling.</span></div>
+  <div class="buttons"><button id="restart" class="main" disabled>Browse</button><button id="more" disabled>Fetch next page</button><button id="allMeta" disabled>Enumerate all metadata</button><button id="cancelMeta" disabled>Stop</button></div>
+  <div id="listNote" class="note">API page defaults to 1000; only visible rows enter the DOM.</div>
+ </div>
+ <div id="entries" class="entries"><div id="space" class="space"><div class="empty">Connect Drive or choose local files.</div></div></div>
+ <div class="selectbar"><div class="row"><span id="chosen" class="badge">0 selected</span><button id="selectViewport">Select visible</button><button id="selectLoaded">Select loaded</button><button id="clearChosen">Clear</button></div></div>
+</section>
+</div>
+
+<div class="right">
+<details class="panel" open><summary>Content search <span id="resultB" class="badge">0 retained</span></summary><div class="body">
+ <div class="field"><label>Find content</label><input id="query" placeholder='swarm or "system prompt"'></div>
+ <div class="field"><label>Exclude terms; quote phrases</label><input id="exclude" placeholder='TODO "irrelevant output"'></div>
+ <div class="grid">
+  <div class="field"><label>Scan area</label><select id="scanArea"><option value="viewport">Visible rows</option><option value="selected">Selected files</option><option value="loaded">Loaded metadata</option><option value="folder">Looking folder · streamed</option><option value="targets">Target folders · streamed</option><option value="corpus">Selected corpus · streamed</option></select></div>
+  <div class="field"><label>Max files scanned · 0 all</label><input id="scanLimit" type="number" min="0" value="0"></div>
+ </div>
+ <div class="grid">
+  <div class="field"><label>Search goal</label><select id="goal"><option value="enough">Stop after retained limit</option><option value="complete">Complete selected scope</option></select></div>
+  <div class="field"><label>Retain matching files · 0 all</label><input id="keepLimit" type="number" min="0" value="200"></div>
+ </div>
+ <div class="grid">
+  <div class="field"><label>Concurrent downloads</label><select id="concurrency"><option>2</option><option selected>6</option><option>10</option></select></div>
+  <div class="field"><label>Skip body over MB · 0 all</label><input id="maxBody" type="number" min="0" value="50"></div>
+ </div>
+ <div class="grid">
+  <div class="field"><label>Query mode</label><select id="searchMode"><option value="literal">Literal / phrase</option><option value="all">All terms</option><option value="any">Any terms</option><option value="near">Near terms</option><option value="regex">Regex</option></select></div>
+  <div class="field"><label>Case</label><select id="caseMode"><option value="smart">Smart case</option><option value="ignore">Ignore case</option><option value="match">Match case</option></select></div>
+ </div>
+ <div class="grid">
+  <div class="field"><label>Minimum hits per file</label><input id="minHits" type="number" min="1" value="1"></div>
+  <div class="field"><label>Hit-count work cap per file · 0 all</label><input id="hitCap" type="number" min="0" value="10000"></div>
+ </div>
+ <div class="grid">
+  <div class="field"><label>Any mode: minimum distinct terms</label><input id="minTerms" type="number" min="1" value="1"></div>
+  <div class="field"><label>Near max character span</label><input id="nearSpan" type="number" min="1" value="120"></div>
+ </div>
+ <div class="grid">
+  <div class="field"><label>Decoder</label><select id="decoder"><option value="">Any readable</option><option value="ai-studio-chat">AI Studio chat</option><option value="json">JSON</option><option value="text">Text</option></select></div>
+  <div class="field"><label>Retained detail</label><select id="retainMode"><option value="snippets">Snippets only</option><option value="sections">Matching sections</option><option value="full">Full matched files</option></select></div>
+ </div>
+ <div class="grid">
+  <div class="field"><label>Snippets retained per file</label><input id="maxSnippets" type="number" min="1" value="3"></div>
+  <div class="field"><label>Snippet context characters</label><input id="contextChars" type="number" min="20" value="100"></div>
+ </div>
+ <div class="grid">
+  <div class="field"><label>Result order</label><select id="resultSort"><option value="hits">Most hits</option><option value="scan">Scan order</option><option value="modified">Modified newest</option><option value="name">Name</option></select></div>
+  <label class="tiny"><input id="whole" type="checkbox"> Whole-word boundaries</label>
+ </div>
+ <div class="field"><label>Internal message date; generic files use modified date</label><div class="row"><input id="sFrom" type="date"><input id="sTo" type="date"></div></div>
+ <div class="options">
+  <label><input id="useFilter" type="checkbox" checked> Apply metadata filters in streamed scan</label>　
+  <label><input id="recursive" type="checkbox"> Recurse into target folders</label><br>
+  <label><input id="user" type="checkbox" checked> User</label>　<label><input id="assistant" type="checkbox" checked> Assistant</label>　<label><input id="thought" type="checkbox" checked> Thoughts</label><br>
+  <label><input id="content" type="checkbox" checked> Text/JSON</label>　<label><input id="system" type="checkbox"> System</label>　<label><input id="settings" type="checkbox"> Settings</label>　<label><input id="raw" type="checkbox"> Raw source</label>
+ </div>
+ <div class="buttons"><button id="scan" class="main" disabled>Scan + Search</button><button id="stopScan" disabled>Stop</button><button id="exportTxt">TXT</button><button id="exportJson">JSON</button><button id="clearResults">Clear</button></div>
+ <div class="progress"><i id="bar"></i></div>
+ <div id="scanStats" class="badges"><span class="badge">No scan yet</span></div>
+</div></details>
+<section class="panel"><div class="phead"><h2>Live results</h2><span id="hitsB" class="badge">0 results</span></div><div id="results" class="results-viewport"><div id="resultSpace" class="results-space"><div class="empty">Search selected or streamed content.</div></div></div></section>
+</div></div></div>
+
+<div id="sticky" class="sticky"><span id="stickText">0 selected</span><button id="stickScan" class="main">Search Selected</button></div>
+<div id="modal" class="modal"><div class="dialog"><div class="dhead"><div><strong id="mTitle"></strong><div id="mSub" class="tiny"></div></div><button id="mClose">Close</button></div><div class="tabs"><button data-tab="content">Content</button><button data-tab="info">Info</button><button data-tab="raw">Raw</button></div><div id="view" class="view"></div></div></div>
+
+<script>
+(()=>{'use strict';
+const $=id=>document.getElementById(id), G='application/vnd.google-apps.', DIR=G+'folder', SHORT=G+'shortcut', RO='https://www.googleapis.com/auth/drive.readonly', OVER=6;
+const STORE={get:k=>{try{return localStorage.getItem(k)}catch{return null}},set:(k,v)=>{try{localStorage.setItem(k,v);return true}catch{return false}},del:k=>{try{localStorage.removeItem(k);return true}catch{return false}}};
+let RH=88,RRH=190;
+function syncGeometry(){let c=window.getComputedStyle?.(document.documentElement);RH=parseFloat(c?.getPropertyValue('--rowh'))||88;RRH=parseFloat(c?.getPropertyValue('--resh'))||190}
+const idList='connB metaB memB scanB scopeB connection source auth driveFields localFields clientId scope corpus driveId corpusGrid driveIdField remember disconnect scopeMsg deviceFolder deviceNote pickFiles pickFolder fileInput folderInput filterB fName fExt fMime fFrom fTo fMin fMax fullText itemType arrange order cacheViews cacheRows apiPage trash apply clearFilters clearCache preset savePreset loadPreset deletePreset exportSetup importSetup setupFile path back root target targets browseArea prefetch ahead folders networkNote restart more allMeta cancelMeta listNote entries space chosen selectViewport selectLoaded clearChosen resultB query exclude scanArea scanLimit goal keepLimit concurrency maxBody searchMode caseMode minHits hitCap minTerms nearSpan decoder retainMode maxSnippets contextChars resultSort whole sFrom sTo useFilter recursive user assistant thought content system settings raw scan stopScan exportTxt exportJson clearResults bar scanStats hitsB results resultSpace sticky stickText stickScan modal mTitle mSub mClose view'.split(' '), E={};
+idList.forEach(id=>E[id]=$(id));
+const S={
+ token:'', connected:false, tc:null, source:'drive', root:{id:'root',name:'My Drive',origin:'drive'}, path:[], paths:{}, browse:{drive:'folder',local:'folder'}, targetSets:{drive:new Map(),local:new Map()}, views:new Map(), view:null, local:[], localMode:'', localRoot:null, localTree:new Map(), localSeq:0, selected:new Map(), result:[],
+ layout:'api', listAbort:null, resolveCache:new Map(), lru:0, latency:350, incomplete:false, warn:'',
+ metaAll:false,scan:{busy:false,abort:null,stop:false,seq:0,lastUI:0,known:0,metrics:null,skips:{}}
+}; S.path=[S.root];S.paths.drive=S.path;
+const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])), rx=v=>v.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'), qe=v=>String(v).replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+const ext=n=>(String(n).match(/\.([^.\/]+)$/)||[])[1]?.toLowerCase()||'', fmt=n=>n==null?'—':n<1024?n+' B':n<1048576?(n/1024).toFixed(1)+' KB':(n/1048576).toFixed(1)+' MB', when=x=>x?new Date(x).toLocaleString():'—';
+function badge(el,text,cls=''){el.textContent=text;el.className='badge'+(cls?' '+cls:'')}
+function clamp(id,def,max,min=0){let n=Math.round(+E[id].value||def);n=Math.max(min,Math.min(max,n));E[id].value=n;return n}
+function toast(text,cls=''){E.scopeMsg.textContent=text;E.scopeMsg.className='note'+(cls?' '+cls:'')}
+function delay(ms,signal){return new Promise((resolve,reject)=>{let t=setTimeout(resolve,ms);signal?.addEventListener('abort',()=>{clearTimeout(t);reject(new DOMException('Aborted','AbortError'))},{once:true})})}
+function reason(body){try{return JSON.parse(body).error?.errors?.[0]?.reason||''}catch{return''}}
+function current(){return S.path.at(-1)}
+function targetMap(key=S.source){return S.targetSets[key]}
+function rememberPath(){S.paths[S.source]=S.path;S.browse[S.source]=E.browseArea.value}
+function isShortcut(f){return f.mimeType===SHORT}
+function actualMime(f){return isShortcut(f)?f.shortcutDetails?.targetMimeType||f.mimeType:f.mimeType}
+function isFolder(f){return !!f.localDir||actualMime(f)===DIR}
+function resourcePair(id,key){return key?`${id}/${key}`:''}
+function resourceHeaders(...pairs){let x=pairs.filter(Boolean).join(',');return x?{'X-Goog-Drive-Resource-Keys':x}:{}}
+function fields(){return 'nextPageToken,incompleteSearch,files(id,name,mimeType,size,createdTime,modifiedTime,parents,driveId,webViewLink,resourceKey,capabilities(canDownload),shortcutDetails(targetId,targetMimeType,targetResourceKey))'}
+async function request(url,opt={},label='Drive'){
+ let tries=0,signal=opt.signal;
+ for(;;){
+  let r,body='';
+  try{r=await fetch(url,{...opt,headers:{Authorization:'Bearer '+S.token,...(opt.headers||{})}})}catch(err){if(err.name==='AbortError')throw err;if(++tries<=4){await delay(Math.min(8000,300*2**tries)*(0.7+Math.random()*.6),signal);continue}throw err}
+  if(r.ok)return r;
+  body=await r.text();
+  if(r.status===401){disconnect();throw Error('Authorization expired. Connect again.')}
+  let why=reason(body),retry=r.status===429||r.status>=500||(r.status===403&&/rateLimitExceeded|userRateLimitExceeded/.test(why));
+  if(retry&&tries++<5){
+   toast(`${label}: rate limited or temporarily unavailable; retrying…`,'warn');
+   await delay(Math.min(12000,350*2**tries)*(0.65+Math.random()*.7),signal); continue
+  }
+  let err=Error(`${r.status} ${why||body.slice(0,120)}`); err.status=r.status; err.reason=why; throw err
+ }
+}
+function corpusParams(folder=null){
+ let c=E.corpus.value, p={supportsAllDrives:'true',includeItemsFromAllDrives:'true'};
+ if(folder?.driveId){p.corpora='drive';p.driveId=folder.driveId;return p}
+ if(c==='drive'){if(!E.driveId.value.trim())throw Error('Enter a Shared Drive ID.');p.corpora='drive';p.driveId=E.driveId.value.trim()}
+ else p.corpora=c;
+ return p
+}
+function filterActive(){return !!(E.fName.value.trim()||E.fExt.value.trim()||E.fMime.value.trim()||E.fFrom.value||E.fTo.value||E.fMin.value||E.fMax.value||E.fullText.value.trim()||E.itemType.value!=='all')}
+function queryParts(forScan=false, includeFilter=true){
+ let q=E.trash.checked?[]:['trashed = false'];
+ if(forScan)q.push(`mimeType != '${DIR}'`);
+ if(!includeFilter)return q;
+ let n=E.fName.value.trim(),m=E.fMime.value.trim(),full=E.fullText.value.trim(),t=E.itemType.value;
+ if(n)q.push(`name contains '${qe(n)}'`);
+ if(m)q.push(`mimeType = '${qe(m)}'`);
+ if(!forScan){if(t==='files')q.push(`mimeType != '${DIR}'`);if(t==='folders')q.push(`mimeType = '${DIR}'`)}
+ if(E.fFrom.value)q.push(`modifiedTime >= '${E.fFrom.value}T00:00:00'`);
+ if(E.fTo.value){let x=new Date(E.fTo.value+'T00:00:00Z');x.setUTCDate(x.getUTCDate()+1);q.push(`modifiedTime < '${x.toISOString()}'`)}
+ if(full)q.push(`fullText contains '${qe(full)}'`);
+ return q
+}
+function makeQuery(area,parent,forScan=false,includeFilter=true){
+ let q=queryParts(forScan,includeFilter);
+ if(area==='folder')q.push(`'${qe(parent.id)}' in parents`);
+ return q.join(' and ')||'trashed = false or trashed = true'
+}
+function localPass(f,forScan=false,serverFiltered=false){
+ if(isFolder(f))return !forScan&&E.folders.checked&&E.itemType.value!=='files';
+ if(!forScan&&E.itemType.value==='folders')return false;
+ if(!serverFiltered){
+  let n=E.fName.value.trim().toLowerCase(),m=E.fMime.value.trim(),d=(f.modifiedTime||'').slice(0,10);
+  if(n&&!f.name.toLowerCase().includes(n)||m&&f.mimeType!==m||E.fFrom.value&&d<E.fFrom.value||E.fTo.value&&d>E.fTo.value)return false
+ }
+ let mb=+(f.size||0)/1048576,lo=+E.fMin.value||0,hi=+E.fMax.value||0,x=E.fExt.value.trim().toLowerCase();
+ if(lo&&mb<lo||hi&&mb>hi)return false;
+ if(x){let a=x.split(/[\s,]+/).filter(Boolean),z=ext(f.name);if(!a.some(v=>v==='noext'?!z:v.replace(/^\./,'')===z))return false}
+ return true
+}
+async function listPage(q,token='',folder=null,signal=null){
+ let u=new URL('https://www.googleapis.com/drive/v3/files'), p=corpusParams(folder);
+ Object.entries(p).forEach(([k,v])=>u.searchParams.set(k,v));
+ u.searchParams.set('q',q);u.searchParams.set('spaces','drive');u.searchParams.set('pageSize',String(clamp('apiPage',1000,1000,1)));u.searchParams.set('fields',fields());
+ if(token)u.searchParams.set('pageToken',token);
+ if(E.order.value&&!E.fullText.value.trim())u.searchParams.set('orderBy',E.order.value);
+ let h=resourceHeaders(resourcePair(folder?.id,folder?.resourceKey)),start=performance.now(),r;
+ try{r=await request(u,{signal,headers:h},'Listing')}catch(err){if(token&&err.status===400){err.pageToken=true}throw err}
+ let j=await r.json(),ms=performance.now()-start;S.latency=S.latency*.7+ms*.3;
+ return j
+}
+function viewKey(){
+ let area=E.browseArea.value,parent=area==='folder'?current():null;
+ if(S.source==='local')return JSON.stringify(['local',S.localMode,parent?.id||'',E.fName.value,E.fExt.value,E.fMime.value,E.fFrom.value,E.fTo.value,E.fMin.value,E.fMax.value,E.itemType.value,E.folders.checked]);
+ return JSON.stringify([area,parent?.id||'',parent?.driveId||'',E.corpus.value,E.driveId.value,makeQuery(area,parent||{},false,true),E.order.value,E.fExt.value,E.fMin.value,E.fMax.value,E.folders.checked])
+}
+function newView(key){return {key,source:S.source,area:E.browseArea.value,parent:current(),rows:[],cursor:{},done:false,busy:false,stop:false,pages:0,received:0,scroll:0,touch:++S.lru,incomplete:false,group:null}}
+function touch(v){v.touch=++S.lru;S.views.delete(v.key);S.views.set(v.key,v)}
+function cacheRows(){let n=0;S.views.forEach(v=>n+=v.rows.length);return n}
+function pruneCache(){
+ let maxViews=clamp('cacheViews',4,30,1),budget=clamp('cacheRows',100000,10000000,1000),total=cacheRows(),victims=[...S.views.values()].filter(v=>v!==S.view).sort((a,b)=>a.touch-b.touch);
+ while((S.views.size>maxViews||total>budget)&&victims.length){let v=victims.shift();S.views.delete(v.key);total-=v.rows.length}
+ let over=S.view&&S.view.rows.length>budget;
+ badge(E.memB,over?`active ${S.view.rows.length.toLocaleString()} > budget`:`cache ${total.toLocaleString()} rows`,over?'warn':'');
+}
+function active(reset=false){
+ let k=viewKey(),v=!reset&&S.views.get(k);
+ if(!v){v=newView(k);S.views.set(k,v)}
+ touch(v);S.view=v;pruneCache();return v
+}
+function buildGroup(v){
+ if(v.group)return v.group;
+ let g={dirs:[],files:[],dp:new Map(),fp:new Map()};
+ v.rows.forEach(f=>{if(isFolder(f)){g.dp.set(f.id,g.dirs.length);g.dirs.push(f)}else{g.fp.set(f.id,g.files.length);g.files.push(f)}});
+ return v.group=g
+}
+function count(v=S.view){if(!v)return 0;if(S.layout==='api')return v.rows.length;let g=buildGroup(v);return g.dirs.length+g.files.length}
+function itemAt(v,i){if(S.layout==='api')return v.rows[i];let g=buildGroup(v);return S.layout==='folders'?(i<g.dirs.length?g.dirs[i]:g.files[i-g.dirs.length]):(i<g.files.length?g.files[i]:g.dirs[i-g.files.length])}
+function itemIndex(v,f,layout=S.layout){
+ if(layout==='api')return v.rows.indexOf(f);
+ let g=buildGroup(v);
+ return layout==='folders'?(isFolder(f)?g.dp.get(f.id):g.dirs.length+g.fp.get(f.id)):(isFolder(f)?g.files.length+g.dp.get(f.id):g.fp.get(f.id))
+}
+function anchor(v=S.view,layout=S.layout){if(!v||!count(v))return null;let i=Math.min(count(v)-1,Math.max(0,Math.floor(E.entries.scrollTop/RH))),f=itemAt(v,i);return f?{f,off:E.entries.scrollTop-i*RH,layout}:null}
+function restoreAnchor(v,a){if(!a)return;let i=itemIndex(v,a.f,S.layout);if(i>=0)E.entries.scrollTop=i*RH+a.off}
+function append(v,list){
+ let a=S.layout!=='api'&&v===S.view?anchor(v):null,g=v.group;
+ for(let f of list)if(localPass(f,false,v.source==='drive')){v.rows.push(f);if(g){if(isFolder(f)){g.dp.set(f.id,g.dirs.length);g.dirs.push(f)}else{g.fp.set(f.id,g.files.length);g.files.push(f)}}}
+ restoreAnchor(v,a);pruneCache()
+}
+function needLocalStat(){return !!(E.fMime.value.trim()||E.fFrom.value||E.fTo.value||+E.fMin.value||+E.fMax.value)}
+async function statLocal(f){if(f.localDir||f.local||f.stat||!f.handle)return f;let file=await f.handle.getFile();f.mimeType=file.type||'application/octet-stream';f.size=file.size;f.modifiedTime=new Date(file.lastModified).toISOString();f.stat=true;return f}
+function localFileNode(file,id,name=file.name){return {id,name,mimeType:file.type||'application/octet-stream',size:file.size,modifiedTime:new Date(file.lastModified).toISOString(),local:file,stat:true,origin:'local'}}
+function localDirNode(id,name,extra={}){return {id,name,mimeType:DIR,localDir:true,origin:'local',...extra}}
+function liveNode(parent,name,h){return h.kind==='directory'?localDirNode(`device:${parent.id}/${name}`,name,{handle:h,live:true}):{id:`device:${parent.id}/${name}`,name,mimeType:'application/octet-stream',handle:h,localHandle:true,origin:'local'}}
+const SOURCES={
+ drive:{
+  key:'drive',label:'Drive',corpus:true,ready:()=>S.connected,root:()=>S.root,
+  async list(parent,cursor,opt={}){
+   let q=opt.query||makeQuery(opt.area||'folder',parent||S.root,false,true),j=await listPage(q,cursor.token||'',opt.area==='folder'?parent:null,opt.signal);
+   cursor.token=j.nextPageToken||'';
+   return {items:(j.files||[]).map(f=>({...f,origin:'drive'})),received:(j.files||[]).length,done:!cursor.token,incomplete:!!j.incompleteSearch}
+  },
+  resolve:(f,signal)=>resolveDrive(f,signal),
+  folderNode:(f,real)=>({id:real.id,name:isShortcut(f)?`${f.name} ↗`:f.name,driveId:real.driveId||f.driveId,resourceKey:real.resourceKey||'',origin:'drive'}),
+  read:(f,signal,max)=>readDrive(f,signal,max)
+ },
+ local:{
+  key:'local',label:'Device',corpus:false,ready:()=>!!S.localRoot,root:()=>S.localRoot,
+  async list(parent,cursor,opt={}){
+   let batch=clamp('apiPage',1000,1000,1),items=[],done=false;
+   if(parent?.handle){
+    if(!cursor.iterator)cursor.iterator=parent.handle.entries();
+    for(let i=0;i<batch;i++){if(opt.signal?.aborted)throw new DOMException('Aborted','AbortError');let n=await cursor.iterator.next();if(n.done){done=true;break}let f=liveNode(parent,n.value[0],n.value[1]);if(needLocalStat()&&!f.localDir)await statLocal(f);items.push(f)}
+   }else{
+    let all=parent?.children||[],at=cursor.pos||0;items=all.slice(at,at+batch);cursor.pos=at+items.length;done=cursor.pos>=all.length
+   }
+   return {items,received:items.length,done,incomplete:false}
+  },
+  resolve:async f=>f,
+  folderNode:f=>f,
+  read:(f,signal,max)=>readDevice(f,signal,max)
+ }
+};
+function sourceAdapter(key=S.source){return SOURCES[key]}
+function entryAdapter(f){return SOURCES[f?.origin||S.source]}
+async function loadMore(v=S.view){
+ let A=sourceAdapter(v?.source||S.source);
+ if(!v||v.busy||v.done||v.stop||!A.ready())return;
+ v.busy=true;updateButtons();let ctrl=new AbortController();S.listAbort=ctrl;
+ try{
+  let page=await A.list(v.parent,v.cursor,{area:v.area,signal:ctrl.signal});
+  v.pages++;v.received+=page.received;v.done=page.done;v.incomplete=v.incomplete||page.incomplete;S.incomplete=S.incomplete||page.incomplete;append(v,page.items);renderFiles();
+  if(v.incomplete)toast('Drive reported incomplete search for this corpus. Narrow to a specific drive for complete results.','warn')
+ }catch(err){
+  if(err.name==='AbortError')return;
+  if(err.pageToken&&A.key==='drive'){toast('Continuation token expired; restarting this view.','warn');v.rows=[];v.group=null;v.cursor={};v.done=false;v.pages=0;v.received=0;return loadMore(v)}
+  toast(`${A.label} listing failed: ${err.message}`,'bad')
+ }finally{v.busy=false;S.listAbort=null;updateButtons()}
+}
+function restartView(){
+ S.listAbort?.abort();let v=active(true);E.entries.scrollTop=0;renderFiles();loadMore(v)
+}
+async function enumerateAll(){
+ let v=S.view;if(!v||(S.source==='drive'&&!S.connected)||!confirm('Enumerate all remaining metadata for this view? The DOM remains virtual, but metadata memory can grow large.'))return;
+ v.stop=false;S.metaAll=true;E.cancelMeta.disabled=false;updateButtons();
+ while(!v.done&&!v.stop)await loadMore(v);
+ S.metaAll=false;E.cancelMeta.disabled=true;renderFiles()
+}
+function prefetchThreshold(){
+ if(E.prefetch.value==='off')return -1;
+ if(E.prefetch.value==='low')return Math.min(100,clamp('ahead',100,5000));
+ let page=clamp('apiPage',1000,1000,1),base=clamp('ahead',400,5000),velocity=Math.abs(S.scrollV||0),adaptive=Math.ceil(velocity*(S.latency+450)/RH);
+ return Math.max(base,Math.min(Math.floor(page*.8),adaptive))
+}
+function maybePrefetch(){
+ let v=S.view,t=prefetchThreshold();if(!v||t<0||v.done||v.busy)return;
+ let last=Math.ceil((E.entries.scrollTop+E.entries.clientHeight)/RH);
+ if(count(v)-last<=t)loadMore(v)
+}
+function fileRange(){
+ let v=S.view,n=count(v),top=E.entries.scrollTop||0,h=E.entries.clientHeight||550,start=Math.max(0,Math.floor(top/RH)-OVER),end=Math.min(n+(v&&!v.done?1:0),Math.ceil((top+h)/RH)+OVER),files=[];
+ for(let i=start;i<Math.min(n,end);i++)files.push(itemAt(v,i));
+ return {start,end,n,files}
+}
+function rowIcon(f){if(isShortcut(f))return isFolder(f)?'🔗📁':'🔗';return isFolder(f)?'📁':'📄'}
+function statusText(f){if(f.capabilities?.canDownload===false&&!isFolder(f))return ['not downloadable','bad'];if(isShortcut(f))return ['shortcut target','warn'];if(f.localHandle&&!f.stat)return ['device file · metadata/body read on demand',''];return [S.selected.has(f.id)?'selected':'metadata only',S.selected.has(f.id)?'ok':'']}
+function renderFiles(){
+ badge(E.filterB,filterActive()?'active':'none',filterActive()?'ok':'');
+ E.path.textContent=S.path.map(x=>x.name).join(' / ');E.back.disabled=S.path.length<2;
+ let v=S.view;if(!v){E.space.innerHTML='<div class="empty">Connect Drive or choose local files.</div>';updateButtons();selection();return}
+ let r=fileRange(),total=r.n+(v.done?0:1);E.space.style.height=Math.max(E.entries.clientHeight||550,total*RH)+'px';
+ if(!total){E.space.innerHTML='<div class="empty">No metadata loaded.</div>';updateButtons();selection();return}
+ let html='';
+ for(let i=r.start;i<r.end;i++){
+  if(i>=r.n){html+=`<div class="vrow more" style="top:${i*RH}px">More items available · scroll or fetch next page</div>`;continue}
+  let f=itemAt(v,i),folder=isFolder(f),s=statusText(f);
+  html+=`<div class="vrow ${folder?'folder':''}" data-i="${i}" style="top:${i*RH}px"><span class="num">${i+1})</span>${folder?`<span class="icon">${rowIcon(f)}</span>`:`<input class="pick" type="checkbox" ${S.selected.has(f.id)?'checked':''}>`}<div><div class="ename">${esc(f.name)}</div><div class="meta">${folder?(isShortcut(f)?'Folder shortcut':'Folder'):(ext(f.name)||'no extension')+' · '+fmt(+f.size||null)+' · '+when(f.modifiedTime)}</div><div class="status ${s[1]}">${s[0]}</div></div>${folder?'<button class="smallbtn open">Open</button>':f.webViewLink?'<button class="smallbtn ext">Drive</button>':''}</div>`
+ }
+ E.space.innerHTML=html;
+ E.space.querySelectorAll('[data-i]').forEach(node=>{
+  let f=itemAt(v,+node.dataset.i);if(!f)return;
+  if(isFolder(f))node.onclick=ev=>{if(!ev.target.classList.contains('ext'))openFolder(f)};
+  else{
+   node.querySelector('.pick').onchange=ev=>{ev.target.checked?S.selected.set(f.id,f):S.selected.delete(f.id);selection();renderFiles()};
+   node.querySelector('.ext')?.addEventListener('click',()=>open(f.webViewLink,'_blank','noopener'))
+  }
+ });
+ updateButtons();selection()
+}
+function updateButtons(){
+ let v=S.view,A=sourceAdapter(),disabled=!v||!A.ready()||v.busy||v.done;
+ E.more.disabled=disabled;E.allMeta.disabled=disabled;E.cancelMeta.disabled=!v||(!S.metaAll&&!v.busy);
+ let n=count(v),got=v?.received||0,p=v?.pages||0,info=v?(A.key==='local'?`${got.toLocaleString()} device entries read · ${n.toLocaleString()} shown · ${p} batch${p===1?'':'es'} · ${v.done?'end reached':'more available'} · virtual DOM`:`${got.toLocaleString()} received · ${n.toLocaleString()} kept · ${p} page${p===1?'':'s'} · ${v.done?'end reached':'buffering ahead'} · ${S.latency.toFixed(0)} ms last-page estimate`):'Records load in batches; only visible rows enter the DOM.';
+ if(A.key==='drive'&&E.fullText.value.trim())info+=' · Drive fullText prefilter active; orderBy omitted';
+ E.listNote.textContent=info;badge(E.metaB,`${n.toLocaleString()} metadata`,n?'ok':'')
+}
+function arrangement(){
+ let a=anchor(S.view,S.layout);S.layout=E.arrange.value;if(S.layout!=='api'&&S.view)buildGroup(S.view);restoreAnchor(S.view,a);if(S.layout==='api'&&S.view)S.view.group=null;renderFiles()
+}
+async function getMetadata(id,key='',signal=null){
+ let cache=S.resolveCache.get(id);if(cache){S.resolveCache.delete(id);S.resolveCache.set(id,cache);return cache}
+ let u=new URL(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(id)}`);
+ u.searchParams.set('supportsAllDrives','true');u.searchParams.set('fields','id,name,mimeType,size,createdTime,modifiedTime,driveId,webViewLink,resourceKey,capabilities(canDownload),shortcutDetails(targetId,targetMimeType,targetResourceKey)');
+ let r=await request(u,{signal,headers:resourceHeaders(resourcePair(id,key))},'Resolve shortcut'),f=await r.json();S.resolveCache.set(id,f);while(S.resolveCache.size>2000)S.resolveCache.delete(S.resolveCache.keys().next().value);return f
+}
+async function resolveDrive(f,signal=null){
+ if(!isShortcut(f))return f;
+ let d=f.shortcutDetails;if(!d?.targetId)throw Error('Broken shortcut');
+ let target=await getMetadata(d.targetId,d.targetResourceKey||'',signal);
+ target={...target,viaShortcut:f,resourceKey:target.resourceKey||d.targetResourceKey||''};
+ return target
+}
+async function openFolder(f){
+ try{
+  let A=entryAdapter(f),real=await A.resolve(f);
+  S.view&&(S.view.scroll=E.entries.scrollTop);S.path.push(A.folderNode(f,real));rememberPath();E.browseArea.value='folder';activatePath()
+ }catch(err){toast('Cannot open folder: '+err.message,'bad')}
+}
+function activatePath(){let v=active(false);E.entries.scrollTop=v.scroll||0;renderFiles();if(!v.pages)loadMore(v)}
+function renderTargets(){E.targets.innerHTML=[...targetMap().values()].map(f=>`<span class="chip">${esc(f.name)} <button data-x="${esc(f.id)}">×</button></span>`).join('');E.targets.querySelectorAll('[data-x]').forEach(b=>b.onclick=()=>{targetMap().delete(b.dataset.x);renderTargets()})}
+function selection(){
+ let n=S.selected.size,drive=0,device=0;for(let f of S.selected.values())if(f.origin==='local')device++;else drive++;
+ let text=n?`${n} selected${drive&&device?` · Drive ${drive} / Device ${device}`:''}`:'0 selected';
+ badge(E.chosen,text,n?'ok':'');E.sticky.classList.toggle('show',matchMedia('(max-width:909px)').matches&&n>0&&!S.scan.busy);E.stickText.textContent=text
+}
+function enterLocalRoot(root,mode){
+ S.localMode=mode;S.localRoot=root;for(let [k,v] of S.views)if(v.source==='local')S.views.delete(k);
+ S.targetSets.local.clear();S.paths.local=[root];S.browse.local='folder';E.source.value='local';switchSource(true);toast(mode==='live'?'Device folder opened in live read-only mode. Subfolders load as you browse.':'Folder snapshot loaded. Empty folders cannot be reconstructed from file-selection paths.','warn')
+}
+function localFileList(files){
+ let root=localDirNode(`files:${++S.localSeq}`,'Chosen files',{children:[]});
+ [...files].forEach((file,i)=>root.children.push(localFileNode(file,`${root.id}/${i}`,file.name)));
+ enterLocalRoot(root,'snapshot')
+}
+function localFolderSnapshot(files){
+ let all=[...files],first=(all[0]?.webkitRelativePath||'Selected folder').split('/')[0]||'Selected folder',root=localDirNode(`snapshot:${++S.localSeq}`,first,{children:[]}),dirs=new Map([[root.id,root]]);
+ for(let i=0;i<all.length;i++){
+  let file=all[i],parts=(file.webkitRelativePath||file.name).split('/').filter(Boolean),start=parts[0]===first?1:0,parent=root;
+  for(let j=start;j<parts.length-1;j++){
+   let id=parent.id+'/'+parts[j],dir=dirs.get(id);
+   if(!dir){dir=localDirNode(id,parts[j],{children:[]});dirs.set(id,dir);parent.children.push(dir)}
+   parent=dir
+  }
+  parent.children.push(localFileNode(file,`${parent.id}/file:${i}`,parts.at(-1)||file.name))
+ }
+ S.localTree=dirs;enterLocalRoot(root,'snapshot');
+ toast('Folder snapshot loaded. Empty folders cannot be reconstructed from file-selection paths.','warn')
+}
+async function openDeviceFolder(){
+ if(!window.showDirectoryPicker){E.folderInput.click();return}
+ try{
+  let handle=await window.showDirectoryPicker({id:'drive-lens-device',mode:'read'}),root=localDirNode(`device:${++S.localSeq}`,handle.name,{handle,live:true});
+  enterLocalRoot(root,'live')
+ }catch(err){if(err.name!=='AbortError')toast('Device folder unavailable: '+err.message,'bad')}
+}
+function scanQuery(area,parent,includeFilters,needFolders=false){
+ let q=E.trash.checked?[]:['trashed = false'];
+ if(!needFolders)q.push(`mimeType != '${DIR}'`);
+ if(includeFilters){
+  let n=E.fName.value.trim(),m=E.fMime.value.trim(),full=E.fullText.value.trim();
+  if(n)q.push(`name contains '${qe(n)}'`);
+  if(m)q.push(`mimeType = '${qe(m)}'`);
+  if(E.fFrom.value)q.push(`modifiedTime >= '${E.fFrom.value}T00:00:00'`);
+  if(E.fTo.value){let x=new Date(E.fTo.value+'T00:00:00Z');x.setUTCDate(x.getUTCDate()+1);q.push(`modifiedTime < '${x.toISOString()}'`)}
+  if(full)q.push(`fullText contains '${qe(full)}'`)
+ }
+ if(area==='folder')q.push(`'${qe(parent.id)}' in parents`);
+ return q.join(' and ')||'trashed = false or trashed = true'
+}
+async function* streamTree(folder,recursive,signal,seenFolders){
+ let A=entryAdapter(folder),queue=[folder];
+ while(queue.length&&!S.scan.stop){
+  let parent=queue.shift();if(seenFolders.has(parent.id))continue;seenFolders.add(parent.id);
+  let cursor={},filteredOnServer=A.key==='drive'&&!recursive&&E.useFilter.checked,page;
+  do{
+   let query=A.key==='drive'?scanQuery('folder',parent,filteredOnServer,recursive):'';
+   page=await A.list(parent,cursor,{area:'folder',query,scan:true,recursive,signal});
+   if(page.incomplete)S.incomplete=true;
+   for(let f of page.items){
+    if(isFolder(f)){
+     if(recursive){try{let real=await A.resolve(f,signal);queue.push(A.folderNode(f,real))}catch{}}
+    }else if(!E.useFilter.checked||localPass(f,true,filteredOnServer))yield f
+   }
+  }while(!page.done&&!S.scan.stop)
+ }
+}
+async function* candidates(signal){
+ let area=E.scanArea.value,A=sourceAdapter(),limit=Math.max(0,+E.scanLimit.value||0),n=0,seen=new Set(),take=f=>{let k=(f.origin||S.source)+':'+f.id;if(seen.has(k)||limit&&n>=limit)return false;seen.add(k);n++;return true};
+ if(area==='selected'){for(let f of S.selected.values())if(localPass(f,true,false)&&take(f))yield f;return}
+ if(area==='viewport'){for(let f of fileRange().files)if(!isFolder(f)&&localPass(f,true,false)&&take(f))yield f;return}
+ if(area==='loaded'){for(let f of S.view?.rows||[])if(!isFolder(f)&&localPass(f,true,false)&&take(f))yield f;return}
+ if(area==='folder'){for await(let f of streamTree(current(),false,signal,new Set())){if(!take(f))return;yield f}return}
+ if(area==='targets'){let used=new Set();for(let folder of targetMap().values())for await(let f of streamTree(folder,E.recursive.checked,signal,used)){if(!take(f))return;yield f}return}
+ if(!A.corpus)return;
+ let cursor={},page;
+ do{
+  page=await A.list(null,cursor,{area:'corpus',query:scanQuery('corpus',{},E.useFilter.checked),scan:true,signal});
+  if(page.incomplete)S.incomplete=true;
+  for(let f of page.items)if(!isFolder(f)&&localPass(f,true,A.key==='drive')){if(!take(f))return;yield f}
+ }while(!page.done&&!S.scan.stop)
+}
+function exportMime(m){
+ return m===G+'document'?'text/plain':m===G+'spreadsheet'?'text/csv':m===G+'presentation'?'text/plain':m===G+'script'?'application/vnd.google-apps.script+json':''
+}
+function readable(f,ct,b){
+ if(/text\/|json|javascript|xml|csv|html|markdown|css/i.test(ct+' '+f.name))return true;
+ let p=new TextDecoder().decode(b.slice(0,512)).trimStart();if('{['.includes(p[0]))return true;
+ let bad=0;for(let x of b.slice(0,512))if(x===0||x<9||x>13&&x<32)bad++;return bad<3
+}
+function skip(msg,code='skipped'){let e=Error(msg);e.code=code;throw e}
+async function readDevice(f,signal,max){
+ let file=f.local||await f.handle?.getFile();if(!file)skip('Device file unavailable','unsupported');
+ if(max&&file.size>max*1048576)skip('Above body-size limit','tooLarge');
+ return {text:await file.text(),type:file.type||f.mimeType,coverage:''}
+}
+async function readDrive(f,signal,max){
+ let mime=actualMime(f),out=exportMime(mime),url,coverage='';
+ if(mime.startsWith(G)){
+  if(!out)skip('Unsupported Workspace export','unsupported');
+  if(mime===G+'spreadsheet')coverage='Google Sheets CSV export searches the exported sheet only.';
+  url=`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(f.id)}/export?mimeType=${encodeURIComponent(out)}`
+ }else url=`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(f.id)}?alt=media&supportsAllDrives=true`;
+ let h=resourceHeaders(resourcePair(f.id,f.resourceKey)),r=await request(url,{signal,headers:h},'Download'),b=new Uint8Array(await r.arrayBuffer()),ct=r.headers.get('content-type')||mime;
+ if(max&&b.length>max*1048576)skip('Above body-size limit','tooLarge');
+ if(!readable(f,ct,b))skip('Unsupported binary content','unsupported');
+ return {text:new TextDecoder().decode(b),type:ct,coverage,real:f}
+}
+async function getBody(original,signal){
+ let A=entryAdapter(original),f=await A.resolve(original,signal),max=+E.maxBody.value||0;
+ if(f.capabilities?.canDownload===false)skip('Not downloadable','notDownloadable');
+ if(max&&f.size&&+f.size>max*1048576)skip('Above body-size limit','tooLarge');
+ return A.read(f,signal,max)
+}
+function flatten(v,out=[],p=''){
+ if(typeof v==='string'){if(!p.endsWith('thoughtSignature')&&v.trim())out.push({kind:'content',label:p,text:v})}
+ else if(Array.isArray(v))v.forEach((x,i)=>flatten(x,out,`${p}[${i}]`));
+ else if(v&&typeof v==='object')Object.entries(v).forEach(([k,x])=>k!=='thoughtSignature'&&flatten(x,out,p?`${p}.${k}`:k));
+ return out
+}
+function signature(x){try{let b=Uint8Array.from(atob(x),c=>c.charCodeAt(0)),i=0,V=()=>{let n=0,k=0,c;do{c=b[i++];n+=(c&127)*2**(7*k++)}while(c&128&&i<b.length);return n},t=b[i++],outer=V(),t2=b[i++],payload=V();return{base64:x.length,bytes:b.length,outerField:t>>3,outerBytes:outer,innerField:t2>>3,payload,prefix:[...b.slice(i,i+16)].map(v=>v.toString(16).padStart(2,'0')).join(' ')}}catch{return{base64:x.length,error:'Invalid Base64'}}}
+function decode(file,body){
+ let raw=body.text,z=raw.trim(),j=null;try{if('{['.includes(z[0]))j=JSON.parse(raw)}catch{}
+ if(j&&Array.isArray(j?.chunkedPrompt?.chunks)){
+  let sections=[],signatures=[],sys=flatten(j.systemInstruction||{}).map(x=>x.text).join('\n');
+  if(sys)sections.push({kind:'system',text:sys});
+  if(j.runSettings)sections.push({kind:'settings',text:JSON.stringify(j.runSettings,null,2)});
+  j.chunkedPrompt.chunks.forEach(c=>{let text=c.text||(c.parts||[]).map(p=>p.text||'').join(''),kind=c.isThought?'thought':c.role==='user'?'user':'assistant';if(text)sections.push({kind,text,time:c.createTime||'',tokens:c.tokenCount||0});(c.parts||[]).forEach(p=>p.thoughtSignature&&signatures.push(signature(p.thoughtSignature)))});
+  return {file,decoder:'ai-studio-chat',title:'AI Studio chat',model:j.runSettings?.model||'',sections,signatures,raw,coverage:body.coverage||''}
+ }
+ if(j)return {file,decoder:'json',title:'JSON',model:'',sections:flatten(j),signatures:[],raw,coverage:body.coverage||''};
+ let text=raw;if(/html/i.test(body.type)||/<(?:html|body|div|p|article)\b/i.test(raw.slice(0,500)))try{text=new DOMParser().parseFromString(raw,'text/html').body.textContent||raw}catch{}
+ return {file,decoder:'text',title:'Text',model:'',sections:[{kind:'content',text}],signatures:[],raw,coverage:body.coverage||''}
+}
+function tokens(q){let a=[];String(q).replace(/"([^"]+)"|(\S+)/g,(_,p,w)=>a.push(p||w));return [...new Set(a)]}
+function caseSensitive(q=E.query.value){return E.caseMode.value==='match'||E.caseMode.value==='smart'&&/[A-Z]/.test(q)}
+function sourceForLiteral(t){let p=rx(t);return E.whole.checked?`(?<![\\p{L}\\p{N}_])(?:${p})(?![\\p{L}\\p{N}_])`:p}
+function literalRegex(t,q=E.query.value){return new RegExp(sourceForLiteral(t),caseSensitive(q)?'gu':'giu')}
+function collect(text,re,remaining,want){
+ let count=0,pos=[],m,capped=false;re.lastIndex=0;
+ while((m=re.exec(text))){
+  count++;if(pos.length<want)pos.push({p:m.index,n:m[0].length||1});
+  if(remaining&&count>=remaining){capped=true;break}
+  if(!m[0].length)re.lastIndex++
+ }
+ return {count,pos,capped}
+}
+function nearCollect(text,terms,remaining,want){
+ if(!terms.length)return {count:0,pos:[],capped:false};
+ let sources=terms.map(t=>'('+sourceForLiteral(t)+')'),re=new RegExp(sources.join('|'),caseSensitive()? 'gu':'giu'),queue=[],counts=Array(terms.length).fill(0),have=0,count=0,pos=[],m,span=Math.max(1,+E.nearSpan.value||120),capped=false;
+ while((m=re.exec(text))){
+  let id=m.slice(1).findIndex(x=>x!==undefined);if(id<0){if(!m[0].length)re.lastIndex++;continue}
+  queue.push({p:m.index,n:m[0].length||1,id});if(counts[id]++===0)have++;
+  while(queue.length&&counts[queue[0].id]>1){counts[queue.shift().id]--}
+  if(have===terms.length){
+   let end=m.index+(m[0].length||1),len=end-queue[0].p;
+   if(len<=span){count++;if(pos.length<want)pos.push({p:queue[0].p,n:len});if(remaining&&count>=remaining){capped=true;break}}
+   let first=queue.shift();if(--counts[first.id]===0)have--
+  }
+  if(!m[0].length)re.lastIndex++
+ }
+ return {count,pos,capped}
+}
+function excerpt(t,p,n){let c=Math.max(20,+E.contextChars.value||100),a=Math.max(0,p-c),b=Math.min(t.length,p+n+c);return(a?'…':'')+t.slice(a,b)+(b<t.length?'…':'')}
+function roleAllowed(kind){return ({user:E.user,assistant:E.assistant,thought:E.thought,content:E.content,system:E.system,settings:E.settings}[kind]||E.content).checked}
+function sectionDate(s,doc){let a=E.sFrom.value,b=E.sTo.value,z=(s.time||doc.file.modifiedTime||'').slice(0,10);return(!a&&!b)||!!z&&(!a||z>=a)&&(!b||z<=b)}
+function analyze(doc){
+ if(E.decoder.value&&doc.decoder!==E.decoder.value)return null;
+ let query=E.query.value.trim(),mode=E.searchMode.value,parts=mode==='literal'||mode==='regex'?[query]:tokens(query),exclude=tokens(E.exclude.value.trim()),sections=doc.sections.filter(s=>roleAllowed(s.kind)&&sectionDate(s,doc));
+ if(E.raw.checked)sections.push({kind:'raw',text:doc.raw});
+ if(exclude.length&&sections.some(s=>exclude.some(t=>literalRegex(t,E.exclude.value).test(s.text))))return null;
+ let cap=Math.max(0,+E.hitCap.value||0),snipLimit=Math.max(1,+E.maxSnippets.value||3),total=0,capped=false,hits=[],matched=[],found=new Set();
+ for(let s of sections){
+  let remaining=cap?Math.max(0,cap-total):0;if(cap&&!remaining){capped=true;break}
+  let out=[];
+  if(mode==='regex'){
+   let p=E.whole.checked?`(?<![\\p{L}\\p{N}_])(?:${query})(?![\\p{L}\\p{N}_])`:query;
+   out=[collect(s.text,new RegExp(p,caseSensitive()?'gu':'giu'),remaining,Math.max(0,snipLimit-hits.length))]
+  } else if(mode==='near') out=[nearCollect(s.text,parts,remaining,Math.max(0,snipLimit-hits.length))];
+  else {
+   for(let i=0;i<parts.length;i++){
+    let room=cap?Math.max(0,cap-total-out.reduce((n,x)=>n+x.count,0)):0, o=collect(s.text,literalRegex(parts[i]),room,Math.max(0,snipLimit-hits.length));
+    if(o.count)found.add(i);out.push(o);if(cap&&out.reduce((n,x)=>n+x.count,0)>=remaining)break
+   }
+  }
+  let c=out.reduce((n,x)=>n+x.count,0);if(!c)continue;
+  total+=c;matched.push(s);capped=capped||out.some(x=>x.capped);
+  for(let o of out)for(let p of o.pos){if(hits.length<snipLimit)hits.push({kind:s.kind,time:s.time||'',text:excerpt(s.text,p.p,p.n),count:c})}
+  if(cap&&total>=cap){capped=true;break}
+ }
+ if(mode==='near'&&total)parts.forEach((_,i)=>found.add(i));
+ if((mode==='all'||mode==='any')&&capped){
+  for(let i=0;i<parts.length;i++)if(!found.has(i)&&sections.some(s=>literalRegex(parts[i]).test(s.text)))found.add(i)
+ }
+ let qualified=mode==='all'?found.size===parts.length:mode==='any'?found.size>=Math.max(1,+E.minTerms.value||1):total>0;
+ if(!qualified||total<Math.max(1,+E.minHits.value||1))return null;
+ return {total,capped,distinct:found.size,hits,matched}
+}
+function compactResult(doc,a,seq){
+ let r={file:doc.file,decoder:doc.decoder,title:doc.title,model:doc.model,count:a.total,capped:a.capped,distinct:a.distinct,hits:a.hits,seq,coverage:doc.coverage||'',signatureCount:doc.signatures.length};
+ if(E.retainMode.value==='sections')r.sections=a.matched;
+ if(E.retainMode.value==='full')r.doc=doc;
+ return r
+}
+function sortResults(){
+ let mode=E.resultSort.value;
+ S.result.sort(mode==='hits'?(a,b)=>b.count-a.count||a.seq-b.seq:mode==='modified'?(a,b)=>String(b.file.modifiedTime||'').localeCompare(String(a.file.modifiedTime||'')):mode==='name'?(a,b)=>a.file.name.localeCompare(b.file.name):(a,b)=>a.seq-b.seq)
+}
+function paint(text){
+ let q=E.query.value.trim(),mode=E.searchMode.value,re;
+ try{
+  if(mode==='regex'){let p=E.whole.checked?`(?<![\\p{L}\\p{N}_])(?:${q})(?![\\p{L}\\p{N}_])`:q;re=new RegExp(p,caseSensitive()?'gu':'giu')}
+  else{let p=(mode==='literal'?[q]:tokens(q)).map(sourceForLiteral).sort((a,b)=>b.length-a.length).join('|');re=new RegExp(p,caseSensitive()?'gu':'giu')}
+ }catch{return esc(text)}
+ let out='',last=0,m,n=0;while((m=re.exec(text))&&n++<100){out+=esc(text.slice(last,m.index))+`<mark>${esc(m[0])}</mark>`;last=m.index+(m[0].length||1);if(!m[0].length)re.lastIndex++}
+ return out+esc(text.slice(last))
+}
+function resultRange(){let n=S.result.length,top=E.results.scrollTop||0,h=E.results.clientHeight||500,start=Math.max(0,Math.floor(top/RRH)-3),end=Math.min(n,Math.ceil((top+h)/RRH)+3);return {start,end,n}}
+function renderResults(){
+ sortResults();let r=resultRange();E.resultSpace.style.height=Math.max(E.results.clientHeight||500,r.n*RRH)+'px';
+ badge(E.hitsB,`${r.n} results`,r.n?'ok':'');badge(E.resultB,`${r.n} retained`,r.n?'ok':'');
+ if(!r.n){E.resultSpace.innerHTML='<div class="empty">No retained matches.</div>';return}
+ let html='';
+ for(let i=r.start;i<r.end;i++){
+  let x=S.result[i],label=x.capped?`≥${x.count.toLocaleString()} hits`:`${x.count.toLocaleString()} hits`,preview=x.hits[0]?.text||'Match retained.';
+  html+=`<div class="result" data-r="${i}" style="top:${i*RRH}px"><div class="result-top"><div><div class="result-title">${esc(x.file.name)}</div><div class="tiny">${x.file.origin==='local'?'Device':'Drive'} · ${esc(x.title)}${x.model?' · '+esc(x.model.replace('models/','')):''}${x.coverage?' · limited export':''}</div></div><span class="badge ok">${label}</span></div><div class="snip">${paint(preview)}</div><div class="buttons"><button class="smallbtn openResult">Open</button>${x.file.webViewLink?'<button class="smallbtn driveResult">Drive</button>':''}<span class="tiny">${x.hits.length} snippet${x.hits.length===1?'':'s'} retained</span></div></div>`
+ }
+ E.resultSpace.innerHTML=html;
+ E.resultSpace.querySelectorAll('[data-r]').forEach(n=>{let x=S.result[+n.dataset.r];n.querySelector('.openResult').onclick=()=>openResult(x);n.querySelector('.driveResult')?.addEventListener('click',()=>open(x.file.webViewLink,'_blank','noopener'))})
+}
+function updateScanUI(force=false){
+ let sc=S.scan,m=sc.metrics;if(!m)return;
+ let now=performance.now();if(!force&&now-sc.lastUI<120)return;sc.lastUI=now;
+ badge(E.scanB,sc.busy?'scanning…':sc.stop?'stopped':'done',sc.busy?'warn':sc.stop?'warn':'ok');
+ E.scanStats.innerHTML=`<span class="badge">${m.files.toLocaleString()} scanned</span><span class="badge ok">${m.matched.toLocaleString()} matched</span><span class="badge">${S.result.length.toLocaleString()} retained</span><span class="badge bad">${m.failed.toLocaleString()} failed</span><span class="badge">${m.skipped.toLocaleString()} skipped</span>`;
+ if(sc.known){E.bar.classList.remove('run');E.bar.style.width=`${Math.min(100,m.files/sc.known*100)}%`}else if(sc.busy){E.bar.style.width='';E.bar.classList.add('run')}else{E.bar.classList.remove('run');E.bar.style.width='100%'}
+ renderResults()
+}
+async function startScan(areaOverride=''){
+ if(S.scan.busy)return toast('A scan is already running. Stop it before starting another.','warn');
+ if(areaOverride)E.scanArea.value=areaOverride;
+ let q=E.query.value.trim();if(!q)return toast('Enter content search text first.','warn');
+ try{if(E.searchMode.value==='regex'){let p=E.whole.checked?`(?<![\\p{L}\\p{N}_])(?:${q})(?![\\p{L}\\p{N}_])`:q;new RegExp(p,caseSensitive()?'gu':'giu')}}catch(err){return toast('Regex error: '+err.message,'bad')}
+ let broad=['folder','targets','corpus'].includes(E.scanArea.value),unlimited=!(+E.scanLimit.value||0);
+ if(E.scanArea.value==='targets'&&E.recursive.checked&&E.fullText.value.trim()&&E.useFilter.checked)toast('Recursive target scan bypasses Drive fullText prefilter so matching descendants are not hidden by parent folders.','warn');
+ if(broad&&unlimited&&!confirm('Scan this whole scope without a file-count limit? It streams data and keeps matched results only, but may use significant network/time.'))return;
+ let sc=S.scan={busy:true,abort:new AbortController(),stop:false,seq:0,lastUI:0,known:0,metrics:{files:0,matched:0,failed:0,skipped:0},skips:{}},cap=+E.keepLimit.value||0,iter;
+ S.result=[];renderResults();selection();E.scan.disabled=true;E.stopScan.disabled=false;
+ if(['selected','viewport','loaded'].includes(E.scanArea.value)){
+  let list=E.scanArea.value==='selected'?[...S.selected.values()]:E.scanArea.value==='viewport'?fileRange().files:(S.view?.rows||[]);
+  sc.known=list.filter(f=>!isFolder(f)&&localPass(f,true,false)).length
+ }
+ try{iter=candidates(sc.abort.signal)}catch(err){toast(err.message,'bad');return}
+ let done=false,workers=Math.max(1,+E.concurrency.value||6);
+ async function worker(){
+  while(!done&&!sc.stop){
+   let item;try{item=await iter.next()}catch(err){if(err.name!=='AbortError')toast('Scan listing failed: '+err.message,'bad');done=true;return}
+   if(item.done){done=true;return}
+   let f=item.value,seq=sc.seq++;sc.metrics.files++;
+   try{
+    let doc=decode(f,await getBody(f,sc.abort.signal)),a=analyze(doc);
+    if(a){
+     sc.metrics.matched++;
+     if(!cap||S.result.length<cap)S.result.push(compactResult(doc,a,seq));
+     if(E.goal.value==='enough'&&cap&&S.result.length>=cap){sc.stop=true;sc.abort.abort()}
+    }
+   }catch(err){
+    if(err.name!=='AbortError'){if(err.code){sc.metrics.skipped++;sc.skips[err.code]=(sc.skips[err.code]||0)+1}else sc.metrics.failed++}
+   }
+   updateScanUI()
+  }
+ }
+ await Promise.all(Array.from({length:workers},worker));
+ sc.busy=false;E.scan.disabled=S.source==='drive'&&!S.connected;E.stopScan.disabled=true;selection();updateScanUI(true);
+ let skipped=Object.entries(sc.skips).map(([k,v])=>`${k}: ${v}`).join(', ');
+ toast(`Scan ${sc.stop?'stopped':'finished'}: ${sc.metrics.files} files checked, ${sc.metrics.matched} matched${skipped?'; skipped '+skipped:''}.`,sc.stop?'warn':'')
+}
+function stopScan(){if(!S.scan.busy)return;S.scan.stop=true;S.scan.abort?.abort();updateScanUI(true)}
+let opened=null,tab='content';
+async function openResult(r){
+ if(r.doc)return openDoc(r.doc);
+ if(r.sections)return openDoc({file:r.file,title:r.title+' · matched sections retained',model:r.model,sections:r.sections,signatures:[],raw:'Full/raw source was not retained.',coverage:r.coverage});
+ E.modal.classList.add('show');E.mTitle.textContent=r.file.name;E.mSub.textContent='Reloading full content…';E.view.textContent='Loading…';
+ try{openDoc(decode(r.file,await getBody(r.file,new AbortController().signal)))}catch(err){E.view.textContent='Unable to open full content: '+err.message}
+}
+function openDoc(doc){opened=doc;tab='content';E.modal.classList.add('show');E.mTitle.textContent=doc.file.name;E.mSub.textContent=doc.title+(doc.model?' · '+doc.model:'')+(doc.coverage?' · '+doc.coverage:'');renderModal()}
+function renderModal(){
+ if(!opened)return;
+ if(tab==='raw'){E.view.textContent=opened.raw;return}
+ if(tab==='info'){
+  let d=opened,t=`Decoder: ${d.title}\nMIME: ${d.file.mimeType||'—'}\nSize: ${fmt(+d.file.size||null)}\nModified: ${when(d.file.modifiedTime)}\nModel: ${d.model||'—'}\nSections: ${d.sections.length}\nSignatures: ${d.signatures.length}\nCoverage note: ${d.coverage||'—'}`;
+  if(d.signatures.length)t+='\n\n'+d.signatures.map((x,i)=>`Signature ${i+1}\nBase64 chars: ${x.base64}\nDecoded bytes: ${x.bytes||'—'}\nPayload bytes: ${x.payload||'—'}\nReadable plaintext: no\nPrefix: ${x.prefix||'—'}`).join('\n\n');
+  E.view.textContent=t;return
+ }
+ E.view.innerHTML=opened.sections.map(s=>`<div class="msg ${esc(s.kind)}"><div class="who">${esc(s.kind.toUpperCase())}${s.time?' · '+esc(when(s.time)):''}${s.tokens?' · '+s.tokens+' tokens':''}</div>${esc(s.text)}</div>`).join('')
+}
+function download(name,text,type){let a=document.createElement('a');a.href=URL.createObjectURL(new Blob([text],{type}));a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),500)}
+function reportJSON(){
+ return {query:E.query.value,exclude:E.exclude.value,scope:{source:S.source,corpus:E.corpus.value,driveId:E.driveId.value,browseArea:E.browseArea.value,scanArea:E.scanArea.value,recursive:E.recursive.checked},options:{mode:E.searchMode.value,case:E.caseMode.value,whole:E.whole.checked,minHits:E.minHits.value,hitCap:E.hitCap.value,maxBodyMB:E.maxBody.value,goal:E.goal.value,keepLimit:E.keepLimit.value,roles:['user','assistant','thought','content','system','settings','raw'].filter(k=>E[k].checked)},metrics:S.scan.metrics,incompleteSearch:S.incomplete,results:S.result.map(r=>({file:{source:r.file.origin||S.source,name:r.file.name,id:r.file.id,mimeType:r.file.mimeType,modifiedTime:r.file.modifiedTime},decoder:r.decoder,model:r.model,count:r.count,capped:r.capped,hits:r.hits}))}
+}
+function reportTXT(){
+ let j=reportJSON(),t=`DRIVE LENS SEARCH REPORT\nQuery: ${j.query}\nScan area: ${j.scope.scanArea}\nMode: ${j.options.mode}\nFiles scanned: ${j.metrics?.files||0}\nFiles matched: ${j.metrics?.matched||0}\nRetained: ${j.results.length}\nIncomplete Drive search: ${j.incompleteSearch}\n\n`;
+ j.results.forEach(r=>{t+=`========================================\nFILE: ${r.file.name}\nDECODER: ${r.decoder}\nHITS: ${r.capped?'≥':''}${r.count}\n\n`;r.hits.forEach(h=>t+=`[${h.kind.toUpperCase()}${h.time?' · '+h.time:''}]\n${h.text}\n\n`)});
+ return t
+}
+const SETUP_KEY='drive_lens_setups', SETUP_FIELDS='corpus driveId fName fExt fMime fFrom fTo fMin fMax fullText itemType arrange order cacheViews cacheRows apiPage trash browseArea prefetch ahead folders scanArea scanLimit goal keepLimit concurrency maxBody searchMode caseMode minHits hitCap minTerms nearSpan decoder retainMode maxSnippets contextChars resultSort whole sFrom sTo useFilter recursive user assistant thought content system settings raw'.split(' ');
+function savedSetups(){try{return JSON.parse(STORE.get(SETUP_KEY)||'{}')}catch{return{}}}
+function setupValue(){let x={};SETUP_FIELDS.forEach(k=>x[k]=E[k].type==='checkbox'?E[k].checked:E[k].value);return x}
+function applySetup(x){
+ SETUP_FIELDS.forEach(k=>{if(k in x)E[k].type==='checkbox'?E[k].checked=!!x[k]:E[k].value=String(x[k])});
+ E.driveIdField.classList.toggle('hide',E.corpus.value!=='drive');E.corpusGrid.classList.toggle('single',E.corpus.value!=='drive');S.layout=E.arrange.value;switchSource();restartView()
+}
+function renderPresets(){let p=savedSetups();E.preset.innerHTML='<option value="">— none —</option>'+Object.keys(p).sort().map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join('')}
+function saveSetup(){
+ let n=prompt('Setup name:');if(!n)return;let p=savedSetups();p[n]=setupValue();if(!STORE.set(SETUP_KEY,JSON.stringify(p)))return toast('Local storage is unavailable here; export JSON instead.','warn');renderPresets();E.preset.value=n;toast('Saved setup: '+n)
+}
+function loadSetup(){let x=savedSetups()[E.preset.value];if(x)applySetup(x)}
+function deleteSetup(){let n=E.preset.value;if(!n)return;let p=savedSetups();delete p[n];STORE.set(SETUP_KEY,JSON.stringify(p));renderPresets();toast('Deleted setup: '+n)}
+function exportSetup(){download('drive_lens_setup.json',JSON.stringify({version:1,settings:setupValue()},null,2),'application/json')}
+async function importSetup(file){try{let x=JSON.parse(await file.text()),v=x.settings||x;applySetup(v);toast('Imported setup settings. Save it locally only if desired.')}catch(err){toast('Invalid setup JSON: '+err.message,'bad')}}
+function switchSource(force=false){
+ let next=E.source.value,prior=S.source;
+ if(next!==prior||force){
+  if(next!==prior)rememberPath();
+  S.source=next;let A=sourceAdapter(),fallback=A.root()||{id:'device:none',name:'Device',localDir:true,origin:'local'};
+  S.path=S.paths[next]?.length?S.paths[next]:[fallback];S.paths[next]=S.path;
+  E.browseArea.value=S.browse[next]||'folder';S.view=null
+ }
+ let A=sourceAdapter(),drive=A.key==='drive',tree=A.ready();
+ E.driveFields.classList.toggle('hide',!drive);E.localFields.classList.toggle('hide',drive);
+ ['folder','targets'].forEach(v=>E.scanArea.querySelector?.(`option[value="${v}"]`)?.toggleAttribute('disabled',!tree));
+ E.scanArea.querySelector?.('option[value="corpus"]')?.toggleAttribute('disabled',!A.corpus);
+ E.browseArea.querySelector?.('option[value="corpus"]')?.toggleAttribute('disabled',!A.corpus);
+ if(!A.corpus&&E.browseArea.value==='corpus')E.browseArea.value='folder';
+ if(!A.corpus&&E.scanArea.value==='corpus')E.scanArea.value=tree?'folder':'loaded';
+ E.fullText.disabled=E.order.disabled=E.trash.disabled=!drive;
+ E.deviceFolder.disabled=!window.showDirectoryPicker;
+ E.deviceNote.textContent=window.showDirectoryPicker?'Live device folders list subfolders lazily; Import Folder Snapshot is the broad-browser fallback.':'Live device-folder access is unavailable here; Import Folder Snapshot still reconstructs navigable folders from selected files.';
+ E.networkNote.textContent=drive?'First page waits for Drive; later pages are prefetched ahead of scrolling.':S.localMode==='live'?'Device directory entries are read lazily in batches as you browse.':'Imported folder/file snapshot is browsable without network requests.';
+ E.restart.disabled=!A.ready();E.scan.disabled=!A.ready();renderTargets();
+ if(A.ready()){let v=active(false);E.entries.scrollTop=v.scroll||0;renderFiles();if(!v.pages)loadMore(v)}else renderFiles()
+}
+function scopeState(){let ok=E.scope.value.trim()===RO;badge(E.scopeB,ok?'READ ONLY':'CUSTOM SCOPE',ok?'ok':'warn');toast(ok?'Read-only; tokens and downloaded content stay in page memory.':'Custom scope requested; verify its permissions.',ok?'':'warn')}
+function connect(ev){
+ ev.preventDefault();let id=E.clientId.value.trim(),scope=E.scope.value.trim()||RO;if(!id)return toast('Enter an OAuth Client ID.','bad');
+ if(E.corpus.value==='drive'&&!E.driveId.value.trim())return toast('Specific shared drive mode requires a Shared Drive ID.','bad');
+ if(!window.google?.accounts?.oauth2)return toast('Google authorization library is not ready yet.','warn');
+ if(E.remember.checked&&!STORE.set('lens_client_id',id))toast('Local storage is unavailable here; Client ID will not be remembered.','warn');else if(!E.remember.checked)STORE.del('lens_client_id');
+ S.tc=google.accounts.oauth2.initTokenClient({client_id:id,scope,callback:r=>{if(r.error)return toast('Authorization failed: '+r.error,'bad');S.token=r.access_token;S.connected=true;badge(E.connB,'Drive · connected','ok');E.disconnect.disabled=false;E.restart.disabled=E.scan.disabled=false;E.connection.removeAttribute('open');restartView()}});
+ S.tc.requestAccessToken({prompt:'select_account'})
+}
+function disconnect(){S.listAbort?.abort();stopScan();if(S.token&&window.google?.accounts?.oauth2)google.accounts.oauth2.revoke(S.token,()=>{});S.token='';S.connected=false;E.disconnect.disabled=true;E.restart.disabled=E.scan.disabled=true;badge(E.connB,'Disconnected');toast('Disconnected.')}
+function bind(){
+ E.auth.onsubmit=connect;E.disconnect.onclick=disconnect;E.scope.oninput=scopeState;E.source.onchange=switchSource;E.corpus.onchange=()=>{let specific=E.corpus.value==='drive';E.driveIdField.classList.toggle('hide',!specific);E.corpusGrid.classList.toggle('single',!specific);if(E.corpus.value!=='user')E.browseArea.value='corpus';restartView()};
+ E.deviceFolder.onclick=openDeviceFolder;E.pickFiles.onclick=()=>E.fileInput.click();E.pickFolder.onclick=()=>E.folderInput.click();E.fileInput.onchange=x=>localFileList(x.target.files);E.folderInput.onchange=x=>localFolderSnapshot(x.target.files);
+ E.apply.onclick=restartView;E.clearFilters.onclick=()=>{'fName fExt fMime fFrom fTo fMin fMax fullText'.split(' ').forEach(id=>E[id].value='');E.itemType.value='all';restartView()};
+ E.clearCache.onclick=()=>{let current=S.view;S.views.clear();S.resolveCache.clear();if(current)S.views.set(current.key,current);pruneCache();toast('Inactive metadata and shortcut-target caches cleared.')};
+ E.savePreset.onclick=saveSetup;E.loadPreset.onclick=loadSetup;E.deletePreset.onclick=deleteSetup;E.exportSetup.onclick=exportSetup;E.importSetup.onclick=()=>E.setupFile.click();E.setupFile.onchange=x=>x.target.files[0]&&importSetup(x.target.files[0]);
+ E.arrange.onchange=arrangement;E.order.onchange=restartView;E.itemType.onchange=restartView;E.trash.onchange=restartView;E.folders.onchange=restartView;E.browseArea.onchange=restartView;
+ E.restart.onclick=restartView;E.more.onclick=()=>{if(S.view)S.view.stop=false;loadMore()};E.allMeta.onclick=enumerateAll;E.cancelMeta.onclick=()=>{if(S.view)S.view.stop=true;S.listAbort?.abort()};
+ E.back.onclick=()=>{if(S.path.length>1){S.view&&(S.view.scroll=E.entries.scrollTop);S.path.pop();rememberPath();E.browseArea.value='folder';activatePath()}};
+ E.root.onclick=()=>{S.path=[sourceAdapter().root()||S.root];rememberPath();E.browseArea.value='folder';activatePath()};
+ E.target.onclick=()=>{let f=current();targetMap().set(f.id,{...f});renderTargets()};
+ let lastTop=0,lastTime=performance.now(),raf=0;
+ E.entries.onscroll=()=>{let now=performance.now(),dt=Math.max(1,now-lastTime);S.scrollV=(E.entries.scrollTop-lastTop)/dt;lastTop=E.entries.scrollTop;lastTime=now;if(S.view)S.view.scroll=E.entries.scrollTop;if(!raf)raf=requestAnimationFrame(()=>{raf=0;renderFiles();maybePrefetch()})};
+ E.selectViewport.onclick=()=>{fileRange().files.filter(f=>!isFolder(f)).forEach(f=>S.selected.set(f.id,f));selection();renderFiles()};
+ E.selectLoaded.onclick=()=>{(S.view?.rows||[]).filter(f=>!isFolder(f)).forEach(f=>S.selected.set(f.id,f));selection();renderFiles()};
+ E.clearChosen.onclick=()=>{S.selected.clear();selection();renderFiles()};
+ E.scan.onclick=()=>startScan();E.stopScan.onclick=stopScan;E.stickScan.onclick=()=>startScan('selected');E.resultSort.onchange=renderResults;E.results.onscroll=()=>requestAnimationFrame(renderResults);
+ E.exportTxt.onclick=()=>download('drive_lens_report.txt',reportTXT(),'text/plain');E.exportJson.onclick=()=>download('drive_lens_report.json',JSON.stringify(reportJSON(),null,2),'application/json');
+ E.clearResults.onclick=()=>{S.result=[];S.scan.metrics=null;E.bar.style.width='0';E.bar.classList.remove('run');renderResults();badge(E.scanB,'idle')};
+ E.mClose.onclick=()=>E.modal.classList.remove('show');E.modal.onclick=x=>x.target===E.modal&&E.modal.classList.remove('show');document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{tab=b.dataset.tab;renderModal()})
+}
+window.__LENS_TEST__={S,E,SOURCES,sourceAdapter,entryAdapter,targetMap,queryParts,makeQuery,scanQuery,localPass,newView,append,buildGroup,count,itemAt,arrangement,collect,nearCollect,decode,analyze,renderFiles,renderResults,listPage,loadMore,candidates,getBody,resolveDrive,startScan,pruneCache,localFileList,localFolderSnapshot,openDeviceFolder,openFolder,activatePath,streamTree,switchSource,request};
+syncGeometry();let layoutRAF=0;const resizeLayout=()=>{if(!layoutRAF)layoutRAF=requestAnimationFrame(()=>{layoutRAF=0;syncGeometry();renderFiles();renderResults()})};addEventListener('resize',resizeLayout,{passive:true});window.visualViewport?.addEventListener('resize',resizeLayout,{passive:true});bind();let saved=STORE.get('lens_client_id');if(saved){E.clientId.value=saved;E.remember.checked=true}E.driveIdField.classList.add('hide');E.corpusGrid.classList.add('single');renderPresets();scopeState();switchSource();renderResults();pruneCache();selection()
+})();
+</script>
+</body></html>
