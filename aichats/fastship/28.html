@@ -121,6 +121,7 @@ dialog::backdrop { background: rgba(0,0,0,0.85); backdrop-filter: blur(4px); }
 .msg-row { display: flex; gap: 10px; }
 
 .avatar { width: 30px; height: 30px; border-radius: 50%; flex-shrink: 0; display: grid; place-content: center; font-size: 0.7rem; font-weight: 600; }
+.avatar img{width:100%;height:100%;border-radius:50%;object-fit:cover}
 .user .avatar { background: #3b6fc2; color: #fff; }
 .assistant .avatar { background: #2a6b5c; color: #fff; }
 .system-msg .avatar { background: #6b4e2a; color: #fff; }
@@ -255,7 +256,7 @@ dialog::backdrop { background: rgba(0,0,0,0.85); backdrop-filter: blur(4px); }
 		</div>
 		<div class="settings-panel" id="settingsPanel">
 			<div class="tabs">
-				<button class="tab-btn active" data-tab="model">Model</button>
+				<button class="tab-btn active" data-tab="model">Model</button><button class=tab-btn data-tab=swarm>Swarm</button>
 				<button class="tab-btn" data-tab="ui">UI</button>
 				<button class="tab-btn" data-tab="chats" disabled>Chats</button>
 				<button class="tab-btn" data-tab="io">ex/import↑↓💾</button>
@@ -282,7 +283,7 @@ dialog::backdrop { background: rgba(0,0,0,0.85); backdrop-filter: blur(4px); }
 				<div class="setting-col">
 					<select id="modelSelect" disabled><option value="">Loading...</option></select>
 				</div>
-			</div>
+			</div><div class=tab-content id=tab-swarm><div class=setting-row><select id=agentSelect></select><button class=btn-outline id=addAgentBtn>➕</button><button class=btn-outline id=copyAgentBtn>⧉</button><button class=btn-outline id=editAgentBtn>✏️</button></div></div>
 			<div class="tab-content" id="tab-ui"></div>
 			<div class="tab-content" id="tab-io">
 				<div class="setting-col">
@@ -354,6 +355,7 @@ dialog::backdrop { background: rgba(0,0,0,0.85); backdrop-filter: blur(4px); }
 
 	const SG=[
 ['tab-model','maxTokens','Max output tokens','n','maxTokensInput',384000],
+['tab-swarm','swarm','Enable swarm','b','swarmToggle',0],
 ['tab-ui','statsDisplay','Stats display','s','statsDisplaySelect','+tokens/s',['tokens','characters','+tokens/s','+characters/s']],
 ['tab-ui','showUser','Show user msgs','b','showUserToggle',1],
 ['tab-ui','showAssistant','Show assistant msgs','b','showAssistantToggle',1],
@@ -495,6 +497,9 @@ $q('[id]').forEach(el => els[el.id] = el);
 	for (const k in default_providers) { if (!providers[k]) providers[k] = default_providers[k]; }
 	let activeProviderId = localStorage.getItem('dse_active_provider') || 'deepseek';
 	if (!providers[activeProviderId]) activeProviderId = 'deepseek';
+	const agentTemplate={id:'',name:'New Agent',avatar:'AI',picture:'',description:'',prompt:'',provider:'',model:'',temperature:.7,maxTokens:0,on:1,when:'',batch:[],synth:''};
+	let agents=JSON.parse(localStorage.dse_agents||'{}');
+	const resolveAgent=agent=>agents[agent]||agent, nextAgent=parentNode=>Object.values(agents).find(agent=>{const target=agent.mode==='after'?parentNode:getChildTopologicalCore(parentNode),x=target.depth,condition=''+agent.when;try{return agent.on&&condition&&Function('x','n','return '+(/^[%<>=!+*/-]/.test(condition)?'x'+condition:condition))(x,target)}catch{return false}});
 
 	const isObj=x=>x&&typeof x=='object'&&!Array.isArray(x), asArr=x=>Array.isArray(x)?x:x?[x]:[];
 
@@ -508,7 +513,7 @@ $q('[id]').forEach(el => els[el.id] = el);
 	const modelDef=(p,id)=>modelEntries(p).find(x=>x[0]===id)?.[1]||{};
 	const modelPricing=(p,id)=>modelDef(p,id).pricing||modelDef(default_providers[p?.id],id).pricing||null;
 
-	function getApiKey() { return getMetadata().apiKeys?.[activeProviderId] || ''; }
+	function getApiKey(id=activeProviderId) { return getMetadata().apiKeys?.[id] || ''; }
 
 	function saveApiKey(val) { updateMetadata(m => { m.apiKeys[activeProviderId] = val; }); }
 
@@ -531,33 +536,17 @@ $q('[id]').forEach(el => els[el.id] = el);
 		}
 	}
 
-	function renderProviderDropdown() {
-		els.providerSelect.innerHTML = '';
-		Object.entries(providers).forEach(([key, p]) => {
-			if (key === 'custom_template') return;
-			const opt = document.createElement('option'); opt.value = p.id; opt.textContent = p.name || p.id; els.providerSelect.appendChild(opt);
-	});
-		els.providerSelect.value = activeProviderId; els.apiKeyInput.value = getApiKey();
-	}
-
-	els.providerSelect.addEventListener('change', () => { activeProviderId = els.providerSelect.value; localStorage.setItem('dse_active_provider', activeProviderId); els.apiKeyInput.value = getApiKey(); els.provEditorContainer.style.display = 'none'; loadModels(); });
-
-	els.editProvBtn.addEventListener('click', () => { els.provJsonText.value = JSON.stringify(providers[activeProviderId], null, 4); els.provEditorContainer.style.display = 'flex'; });
-
-	els.addProvBtn.addEventListener('click', () => {
-		const newId = 'custom_' + Date.now(); let newP = structuredClone(providers.custom_template); newP.id = newId; newP.name = 'New Custom Provider'; providers[newId] = newP;
-		localStorage.setItem('dse_providers', JSON.stringify(providers)); activeProviderId = newId; localStorage.setItem('dse_active_provider', activeProviderId);
-		renderProviderDropdown(); els.provJsonText.value = JSON.stringify(newP, null, 4); els.provEditorContainer.style.display = 'flex'; els.apiKeyInput.value = ''; loadModels();
-});
-
-	els.cancelProvJsonBtn.addEventListener('click', () => els.provEditorContainer.style.display = 'none');
-
-	els.saveProvJsonBtn.addEventListener('click', () => {
-		try { const parsed = JSON.parse(els.provJsonText.value); if (!parsed.id) throw new Error("JSON must have 'id'"); if (parsed.id !== activeProviderId) delete providers[activeProviderId];
-			providers[parsed.id] = parsed; activeProviderId = parsed.id; localStorage.setItem('dse_providers', JSON.stringify(providers)); localStorage.setItem('dse_active_provider', activeProviderId);
-			renderProviderDropdown(); els.provEditorContainer.style.display = 'none'; showToast('Provider settings saved!'); loadModels();
-		} catch (e) { alert("Invalid JSON: " + e.message); }
-});
+	const registry=agentMode=>agentMode?[agents,els.agentSelect,'dse_agents']:[providers,els.providerSelect,'dse_providers'];
+	const renderRegistry=agentMode=>{const [r,s]=registry(agentMode);s.replaceChildren(...Object.entries(r).filter(([id])=>agentMode||id!=='custom_template').map(([,item])=>new Option(item.name||item.id,item.id)));if(!agentMode)s.value=activeProviderId,els.apiKeyInput.value=getApiKey()};
+	const saveRegistry=agentMode=>{const [r,,key]=registry(agentMode);localStorage[key]=JSON.stringify(r)};
+	let editingAgents=false;
+	const openRegistryEditor=(agentMode,item)=>(editingAgents=agentMode,(agentMode?els['tab-swarm']:els['tab-model']).append(els.provEditorContainer),els.provJsonText.value=JSON.stringify(item,null,4),els.provEditorContainer.style.display='flex');
+	els.providerSelect.onchange=()=>{activeProviderId=els.providerSelect.value;localStorage.dse_active_provider=activeProviderId;els.apiKeyInput.value=getApiKey();els.provEditorContainer.style.display='none';loadModels()};
+	const createRegistryEntry=(agentMode,item,isCopy=false)=>{const [r,s]=registry(agentMode);item=structuredClone(item||agentTemplate);item.id=(agentMode?'agent_':'custom_')+Date.now();item.name=agentMode?(isCopy?(item.name||item.id)+' Copy':'New Agent'):'New Custom Provider';r[item.id]=item;saveRegistry(agentMode);renderRegistry(agentMode);s.value=item.id;if(!agentMode)activeProviderId=item.id,localStorage.dse_active_provider=item.id,els.apiKeyInput.value='',loadModels();openRegistryEditor(agentMode,item)};
+	els.editProvBtn.onclick=()=>openRegistryEditor(false,providers[activeProviderId]);els.addProvBtn.onclick=()=>createRegistryEntry(false,providers.custom_template);
+	els.editAgentBtn.onclick=()=>openRegistryEditor(true,agents[els.agentSelect.value]||agentTemplate);els.addAgentBtn.onclick=()=>createRegistryEntry(true);els.copyAgentBtn.onclick=()=>createRegistryEntry(true,agents[els.agentSelect.value],true);
+	els.cancelProvJsonBtn.onclick=()=>els.provEditorContainer.style.display='none';
+	els.saveProvJsonBtn.onclick=()=>{try{const item=JSON.parse(els.provJsonText.value),[r,s]=registry(editingAgents),selectedId=editingAgents?s.value:activeProviderId;if(!item.id)throw Error("JSON must have 'id'");if(item.id!==selectedId)delete r[selectedId];r[item.id]=item;saveRegistry(editingAgents);renderRegistry(editingAgents);if(editingAgents)s.value=item.id,renderFullChat();else activeProviderId=item.id,localStorage.dse_active_provider=item.id,els.providerSelect.value=item.id,loadModels();els.provEditorContainer.style.display='none';showToast((editingAgents?'Agent':'Provider')+' saved!')}catch(error){alert("Invalid JSON: "+error.message)}};
 
 	$q('.tab-btn').forEach(btn => {
 		btn.addEventListener('click', () => {
@@ -572,7 +561,7 @@ $q('[id]').forEach(el => els[el.id] = el);
 		document.documentElement.style.setProperty('--block-font-scale', settings.fontScale);
 		const tabBtn = document.querySelector(`.tab-btn[data-tab="${localStorage.getItem('dse_activeTab') || 'model'}"]`);
 		if (tabBtn && !tabBtn.disabled) tabBtn.click(); else document.querySelector('.tab-btn[data-tab="model"]').click();
-		renderProviderDropdown(); syncUI(); applyVisibility();
+		renderRegistry(false); renderRegistry(true); syncUI(); applyVisibility();
 	}
 
 	let CL=[],CP=()=>window.EO&&(EO.value=CL.join('\n'),EO.scrollTop=1e9);['log','warn','error'].map(k=>{let f=console[k].bind(console);console[k]=(...a)=>(f(...a),CL.push(a.join(' ')),CP())});
@@ -715,7 +704,7 @@ $q('[id]').forEach(el => els[el.id] = el);
 			const payload = { _dse_export: true, chatId: CHAT_ID }; if (els.ioHistoryToggle.checked) payload.chatTree = chatTree;
 			if (els.ioMetaToggle.checked || els.ioKeysToggle.checked) {
 				const metaClone = JSON.parse(JSON.stringify(getMetadata()));
-				if (!els.ioMetaToggle.checked) { delete metaClone.settings; delete metaClone.models; } if (!els.ioKeysToggle.checked) delete metaClone.apiKeys; payload.metadata = metaClone;
+				if (!els.ioMetaToggle.checked) { delete metaClone.settings; delete metaClone.models; } if (!els.ioKeysToggle.checked) delete metaClone.apiKeys; payload.metadata = metaClone; if(els.ioMetaToggle.checked)payload.agents=agents;
 			}
 			downloadText(`AI_Chat_Backup_${Date.now()}.txt`, JSON.stringify(payload)); showToast("Export successfully downloaded!");
 	});
@@ -734,7 +723,7 @@ $q('[id]').forEach(el => els[el.id] = el);
 					if (wantM || wantK) {
 						let cMeta = getMetadata(); let iMeta = parsed.metadata || {};
 						if (wantM && iMeta.settings) { cMeta.settings = { ...defaultSettings, ...(cMeta.settings || {}), ...iMeta.settings }; if (iMeta.models) cMeta.models = { ...(cMeta.models || {}), ...iMeta.models }; }
-						if (wantK && iMeta.apiKeys) cMeta.apiKeys = iMeta.apiKeys; localStorage.setItem('dse_metadata', JSON.stringify(cMeta)); loadSettings();
+						if (wantK && iMeta.apiKeys) cMeta.apiKeys = iMeta.apiKeys; if(wantM&&parsed.agents)agents={...agents,...parsed.agents},saveRegistry(true); localStorage.setItem('dse_metadata', JSON.stringify(cMeta)); loadSettings();
 					}
 					if (wantH && parsed.chatTree) {
 						if (isTreeCorrupted(parsed.chatTree)) await promptRepairBackup(parsed.chatTree);
@@ -920,15 +909,14 @@ $q('[id]').forEach(el => els[el.id] = el);
 		function formatUTCStamp(ms) { if (!Number.isFinite(ms) || ms <= 0) return ''; const d = new Date(ms); const pad = n => String(n).padStart(2, '0'); return `<span class="msg-date">${d.getUTCFullYear()}${pad(d.getUTCMonth() + 1)}${pad(d.getUTCDate())}</span><span class="msg-clock">${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())}</span><span class="msg-zone">UTC</span>`; }
 		function getMessageTimeLabel(node) { return formatUTCStamp(ve(node)); }
 		function generateTopologicalId(parentNode, version = 1) { return `${getChildTopologicalCore(parentNode, version).core}_${Date.now()}`; }
-		function createNode(role, rawContent, thinking, parentId, isGenerating = false) {
+		function createNode(role, rawContent, thinking, parentId, isGenerating = false, {agent,label='',background=false}={}) {
 			const parentNode = parentId ? chatTree.nodes[parentId] : null; const depth = parentNode ? parentNode.depth + 1 : 1; const id = generateTopologicalId(parentNode);
 			const msgNum = ++globalMsgCounter; localStorage.setItem('dse_globalMsgCounter', globalMsgCounter);
-			const node = { id, role, parentId, depth, msgNum, children: [], activeChild: -1, versions: [], activeVersion: 0, isGenerating, e: Date.now(), p: TAB_PID }; node.versions=[ver(node,{rawContent, thinking, isDead: false})];
+			const node = { id, role, parentId, depth, msgNum, children: [], activeChild: -1, versions: [], activeVersion: 0, isGenerating, e: Date.now(), p: TAB_PID }; node.versions=[ver(node,{rawContent,thinking,isDead:false,agentId:agent?.id||'',label,temperature:agent?.temperature})];
 			chatTree.nodes[id] = node; waitingToSave[id] = node;
-			if (parentNode) {
-				parentNode.children.push(id); parentNode.activeChild = parentNode.children.length - 1; waitingToSave[parentNode.id] = parentNode;
-				const pIdx = activeViewList.findIndex(s => s.id === parentId); if (pIdx > -1) rebuildViewArrayFrom(pIdx + 1); else { activeViewList.push({ id: node.id, v: 0 }); saveActiveView(); }
-			} else { activeViewList.push({ id: node.id, v: 0 }); saveActiveView(); }
+			if (parentNode) {parentNode.children.push(id);if(!background||!activeViewList.some(step=>step.id===parentId))parentNode.activeChild=parentNode.children.length-1;waitingToSave[parentNode.id]=parentNode;
+				if(!background){const pathIndex=activeViewList.findIndex(step=>step.id===parentId);if(pathIndex>-1)rebuildViewArrayFrom(pathIndex+1);else{activeViewList.push({id:node.id,v:0});saveActiveView()}}
+			}else if(!background){activeViewList.push({id:node.id,v:0});saveActiveView()}
 			saveHistory(); return node;
 		}
 		function getUnreadDotsHTML(node) { return { dL: node.versions.slice(0, node.activeVersion).some(v => v.unread) ? `<span data-action="v-unread-left" class="v-unread-left" title="Jump to unread">•</span>` : '', dR: node.versions.slice(node.activeVersion + 1).some(v => v.unread) ? `<span data-action="v-unread-right" class="v-unread-right" title="Jump to unread">•</span>` : '' }; }
@@ -964,7 +952,7 @@ $q('[id]').forEach(el => els[el.id] = el);
 		function createMessageDOM(node, isLatest = false) {
 			const msgDiv = document.createElement('div'); msgDiv.className = `message ${node.role}`; msgDiv.dataset.msgId = node.id;
 			const ver = node.versions[node.activeVersion || 0]; const totalChars = (ver.rawContent || '').length + (ver.thinking || '').length;
-			const isSystem = node.role === 'system-msg';
+			const isSystem = node.role === 'system-msg', agent=agents[ver.agentId]||{}, description=escapeHtml(agent.description||''), speaker=node.role==='user'?'You':isSystem?'System':agent.name||'Assistant', avatar=agent.picture?`<img src="${escapeHtml(agent.picture)}">`:escapeHtml(agent.avatar||'AI'), versionLabel=ver.label?` · ${escapeHtml(ver.label)}`:'';
 			let ctrls = '';
 			if (node.versions.length > 1) { const { dL, dR } = getUnreadDotsHTML(node); ctrls += `<div class="version-ctrl">${dL}<button data-action="v-prev" class="v-prev">◀</button> v${node.activeVersion+1}/${node.versions.length} <button data-action="v-next" class="v-next">▶</button>${dR}</div>`; }
 			const parent = chatTree.nodes[node.parentId];
@@ -981,12 +969,12 @@ $q('[id]').forEach(el => els[el.id] = el);
 			}
 			msgDiv.innerHTML = `
 			<div class="msg-header">
-			<span class="msg-meta"><span>${getMessageIdentifiers(node)} · ${node.role === 'user' ? 'You' : isSystem ? 'System' : 'Assistant'}</span><span class="msg-time">${getMessageTimeLabel(node)}</span><span class="char-count">${totalChars > 0 ? getMessageStatString(node, ver) : ''}</span></span>
+			<span class="msg-meta"><span title="${description}">${getMessageIdentifiers(node)} · ${escapeHtml(speaker)}${versionLabel}</span><span class="msg-time">${getMessageTimeLabel(node)}</span><span class="char-count">${totalChars > 0 ? getMessageStatString(node, ver) : ''}</span></span>
 			<button data-action="toggle-msg" class="toggle-btn"></button>
 			</div>
 			<div class="msg-body">
 			<div class="msg-row">
-			<div class="avatar">${node.role === 'user' ? 'U' : isSystem ? '!' : 'AI'}</div>
+			<div class="avatar" title="${description}">${node.role === 'user'?'U':isSystem?'!':avatar}</div>
 			<div class="bubble-wrapper">
 			<div class="bubble">${node.isGenerating && !ver.rawContent && !ver.thinking ? '<div class="typing-indicator"><span></span><span></span><span></span></div>' : buildThinkingSection(ver.thinking, node.id, node.isGenerating) + formatMarkdown(ver.rawContent || '')}</div>
 			<div class="edit-ui"><textarea></textarea><div class="edit-actions"><button data-action="update" class="btn btn-update">Update text only</button><button data-action="branch" class="btn btn-branch">Spawn inline branch</button><button class="btn btn-newchat" disabled style="opacity:0.5" title="Coming soon">Spawn different chat</button><button data-action="cancel-edit" class="btn-outline btn-cancel">Cancel</button></div></div>
@@ -1012,73 +1000,56 @@ $q('[id]').forEach(el => els[el.id] = el);
 			if (node.activeVersion === vIndex) { if (!softFinalizeNodeDOM(node, vIndex)) updateNodeDOM(node); autoCollapseThinkingBlocks(); } else updateVersionDots(node);
 			if (controller) activeControllers.delete(controller); resetStopBtn(); updateSendBtn(); updateTokenDisplay();
 		}
-		async function executeAPI(messages, node, vIndex, controller) {
-		const providerId=activeProviderId,p=providers[providerId],key=getApiKey(),isStream=settings.streaming,modelId=getCurrentModel();
-		const payload = { model: modelId, messages: messages, temperature: 0.7, stream: isStream }; payload[p.maxTokensParam || 'max_tokens'] = settings.maxTokens; if (isStream && p.supportsStreamUsage) payload.stream_options = { include_usage: true };
-		node.versions[vIndex].startTime = Date.now();
-		const res = await fetch(p.baseURL + p.apiPath, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': (p.authHeader ? p.authHeader + ' ' : '') + key }, body: JSON.stringify(payload), signal: controller.signal });
+		async function executeAPI(messages, node, versionIndex, controller, agent=null) {
+		const providerId=agent?.provider&&providers[agent.provider]?agent.provider:activeProviderId, provider=providers[providerId], apiKey=getApiKey(providerId), streaming=settings.streaming;
+		const model=agent?.model||(providerId===activeProviderId?getCurrentModel():getMetadata().models?.[providerId]||provider.defaultModel||modelIds(provider)[0]);
+		const payload={model,messages,temperature:agent?.temperature??.7,stream:streaming,[provider.maxTokensParam||'max_tokens']:agent?.maxTokens||settings.maxTokens};if(streaming&&provider.supportsStreamUsage)payload.stream_options={include_usage:true};
+		node.versions[versionIndex].startTime = Date.now();
+		const res = await fetch(provider.baseURL + provider.apiPath, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': (provider.authHeader ? provider.authHeader + ' ' : '') + apiKey }, body: JSON.stringify(payload), signal: controller.signal });
 		if (!res.ok) throw new Error(`HTTP ${res.status}`);
-		const applyUsage = u => applyResponseMetadata(node.versions[vIndex],u,p,modelId,providerId);
-		if (!isStream) {
-			const data = await res.json(); applyUsage(data.usage); node.versions[vIndex].rawContent = data.choices[0].message.content || ''; node.versions[vIndex].thinking = data.choices[0].message.reasoning_content || '';
-			handleNewContent(node.versions[vIndex].rawContent.length + node.versions[vIndex].thinking.length, true);
+		const applyUsage = usage => applyResponseMetadata(node.versions[versionIndex],usage,provider,model,providerId);
+		if (!streaming) {
+			const data=await res.json(), version=node.versions[versionIndex];applyUsage(data.usage);version.rawContent=data.choices[0].message.content||'';version.thinking=data.choices[0].message.reasoning_content||'';
+			if(node.activeVersion===versionIndex&&activeViewList.some(step=>step.id===node.id))handleNewContent(version.rawContent.length+version.thinking.length,true);else version.unread=true;
 		} else {
-			const reader = res.body.getReader(); const decoder = new TextDecoder(); let fullC = '', fullT = '', buffer = '', isFirstChunk = true, lastRenderedLen = 0;
-			const processLine = (line) => {
-				if (!line.startsWith('data: ')) return; const jsonStr = line.slice(6).trim(); if (!jsonStr || jsonStr === '[DONE]') return;
-				try {
-					const parsed = JSON.parse(jsonStr); fullC += parsed.choices?.[0]?.delta?.content || ''; fullT += parsed.choices?.[0]?.delta?.reasoning_content || '';
-					node.lastUpdateTime = Date.now(); node.versions[vIndex].rawContent = fullC; node.versions[vIndex].thinking = fullT;
-
-					if (isFirstChunk && (fullC || fullT)) { 
-						if(node.activeVersion===vIndex) updateNodeDOM(node); 
-						isFirstChunk = false; 
-						handleNewContent(0, true); 
-					}
-
-					if (!isFirstChunk && (fullC.length + fullT.length > 0)) {
-						if (node.activeVersion !== vIndex) { if (!node.versions[vIndex].unread) { node.versions[vIndex].unread = true; updateVersionDots(node); } }
-						else {
-							node.versions[vIndex].unread = false; const currentLen = fullC.length + fullT.length; handleNewContent(currentLen - lastRenderedLen, false); lastRenderedLen = currentLen;
-							const el = getMessageEl(node.id);
-							if (el) { const bubble = el.querySelector('.bubble'); const charCnt = el.closest('.message').querySelector('.char-count'); const nextHTML = buildThinkingSection(fullT, node.id, true) + formatMarkdown(fullC); if (bubble && bubble.innerHTML !== nextHTML) bubble.innerHTML = nextHTML; if (charCnt) charCnt.textContent = getMessageStatString(node, node.versions[vIndex]); }
-						}
-						if (node.activeVersion === vIndex) scheduleTokenDisplayUpdate(fullC.length, fullT.length);
-						const swKey=node.id+'|'+vIndex,now=Date.now();if(now-(lastBufferWrite[swKey]||0)>500){saveStreamBuffer(node,vIndex);lastBufferWrite[swKey]=now;}
-					}
+			const reader=res.body.getReader(), decoder=new TextDecoder();let fullC='',fullT='',buffer='',isFirstChunk=true,lastCountedLen=0,renderFrame=0;
+			const onVisiblePath=()=>node.activeVersion===versionIndex&&activeViewList.some(step=>step.id===node.id);
+			const renderVisible=()=>{if(!onVisiblePath())return;const el=getMessageEl(node.id),version=node.versions[versionIndex];if(!el)return;const bubble=el.querySelector('.bubble'),charCnt=el.querySelector('.char-count'),nextHTML=buildThinkingSection(version.thinking,node.id,true)+formatMarkdown(version.rawContent);if(bubble&&bubble.innerHTML!==nextHTML)bubble.innerHTML=nextHTML;if(charCnt)charCnt.textContent=getMessageStatString(node,version)};
+			const flushVisible=()=>{renderFrame=0;renderVisible()};
+			const processLine=line=>{
+				if(!line.startsWith('data: '))return;const jsonStr=line.slice(6).trim();if(!jsonStr||jsonStr==='[DONE]')return;
+				try{
+					const parsed=JSON.parse(jsonStr),version=node.versions[versionIndex];fullC+=parsed.choices?.[0]?.delta?.content||'';fullT+=parsed.choices?.[0]?.delta?.reasoning_content||'';node.lastUpdateTime=Date.now();version.rawContent=fullC;version.thinking=fullT;
+					const currentLen=fullC.length+fullT.length;if(currentLen){const nodeOnPath=activeViewList.some(step=>step.id===node.id),visible=nodeOnPath&&node.activeVersion===versionIndex;if(isFirstChunk){if(visible){updateNodeDOM(node);handleNewContent(0,true)}isFirstChunk=false}
+						if(!visible){if(!version.unread){version.unread=true;if(nodeOnPath)updateVersionDots(node)}}else{version.unread=false;handleNewContent(currentLen-lastCountedLen,false);lastCountedLen=currentLen;renderFrame||=requestAnimationFrame(flushVisible);scheduleTokenDisplayUpdate(fullC.length,fullT.length)}
+						const swKey=node.id+'|'+versionIndex,now=Date.now();if(now-(lastBufferWrite[swKey]||0)>500){saveStreamBuffer(node,versionIndex);lastBufferWrite[swKey]=now}}
 					applyUsage(parsed.usage);
-				} catch (e) {}
+				}catch(e){}
 			};
-			while (true) { const { done, value } = await reader.read(); if (done) break; buffer += decoder.decode(value, { stream: true }); const lines = buffer.split('\n'); buffer = lines.pop(); for (let line of lines) processLine(line); }
-			if (buffer.trim()) processLine(buffer.trim());
+			while(true){const {done,value}=await reader.read();if(done)break;buffer+=decoder.decode(value,{stream:true});const lines=buffer.split('\n');buffer=lines.pop();for(const line of lines)processLine(line)}
+			if(buffer.trim())processLine(buffer.trim());if(renderFrame)cancelAnimationFrame(renderFrame),renderFrame=0;renderVisible();
 		}
-		await saveStreamBuffer(node, vIndex);
-		node.versions[vIndex].endTime = node.lastUpdateTime || Date.now(); finalizeGeneration(node, vIndex, controller);
+		await saveStreamBuffer(node, versionIndex);
+		node.versions[versionIndex].endTime=node.lastUpdateTime||Date.now();finalizeGeneration(node,versionIndex,controller);
 	}
-		function buildAPIMessages(targetPath) {
-			const p = providers[activeProviderId]; const messages = [{ role: p.systemRole || 'system', content: 'You are a helpful assistant.' }];
-			targetPath.forEach(n => { if (n.id !== 'root' && n.role !== 'system' && n.role !== 'system-msg' && n.versions[n.activeVersion || 0].rawContent) messages.push({ role: n.role, content: n.versions[n.activeVersion].rawContent }); }); return messages;
+		function buildAPIMessages(targetPath, messages, agent) {
+			if(!messages){const provider=providers[activeProviderId];messages=[{role:provider.systemRole||'system',content:'You are a helpful assistant.'}];targetPath.forEach(node=>{const version=node.versions[node.activeVersion||0];if(node.id!=='root'&&node.role!=='system'&&node.role!=='system-msg'&&version.rawContent)messages.push({role:node.role,content:version.rawContent})})}
+			return agent?.prompt?messages.concat({role:(providers[agent.provider||activeProviderId]||providers[activeProviderId]).systemRole||'system',content:agent.prompt}):messages;
 		}
-		function triggerAI(messages, asstNode, vIndex) {
-			els.sendBtn.style.display = 'none'; els.stopBtn.style.display = 'flex'; const controller = new AbortController(); activeControllers.add(controller); gens[genKey(asstNode.id,vIndex)]=Date.now();tabBeat(1); updateSendBtn();
-			executeAPI(messages, asstNode, vIndex, controller).catch(err => {
-				const ver = asstNode.versions[vIndex]; ver.isDead = true; ver.endTime = Date.now();
-				if (err.name === 'AbortError') { ver.errorIcon = '☠️'; ver.errorText = 'Stopped by user'; } else { ver.errorIcon = '⚠️'; ver.errorText = `Error: ${err.message}`; showToast(`⚠️ Error: ${err.message}`); }
-				finalizeGeneration(asstNode, vIndex, controller);
-		});
-		}
-		function generateAIResponse(overrideLeafId = null) {
-			const path = getViewNodes(); const leafId = overrideLeafId || path[path.length - 1]?.id || 'root';
-			if (leafId !== 'root') updateNodeDOM(chatTree.nodes[leafId]);
-			const asstNode = createNode('assistant', '', '', leafId, true);
-			if (overrideLeafId) renderPathFrom(asstNode.id); else { els.chatContainer.appendChild(createMessageDOM(asstNode, true)); updatePathTracker(); updateSendBtn(); if (isAtBottom) els.chatContainer.scrollTop = els.chatContainer.scrollHeight; }
-			updateTokenDisplay(); triggerAI(buildAPIMessages(getViewNodes()), asstNode, asstNode.activeVersion);
+		function triggerAI(messages,node,versionIndex,agent){els.sendBtn.style.display='none';els.stopBtn.style.display='flex';const controller=new AbortController;activeControllers.add(controller);gens[genKey(node.id,versionIndex)]=Date.now();tabBeat(1);updateSendBtn();return executeAPI(messages,node,versionIndex,controller,agent).then(()=>1).catch(error=>{const version=node.versions[versionIndex];version.isDead=true;version.endTime=Date.now();if(error.name==='AbortError'){version.errorIcon='☠️';version.errorText='Stopped by user'}else{version.errorIcon='⚠️';version.errorText=`Error: ${error.message}`;showToast(`⚠️ Error: ${error.message}`)}finalizeGeneration(node,versionIndex,controller);return error.name==='AbortError'?-1:0})}
+		async function generateAIResponse(parentId=null, {node,versionIndex,agent,messages,swarm,hidden,background,label,retainedMessages,synthesizing}={}) {
+			const path=getViewNodes(), leafId=parentId||path[path.length-1]?.id||'root';
+			if(!node){if(!background&&leafId!=='root')updateNodeDOM(chatTree.nodes[leafId]);node=createNode('assistant','','',leafId,true,{agent,label,background});if(!background){if(parentId)renderPathFrom(node.id);else{els.chatContainer.appendChild(createMessageDOM(node,true));updatePathTracker();updateSendBtn();if(isAtBottom)els.chatContainer.scrollTop=els.chatContainer.scrollHeight}}updateTokenDisplay();
+				if(swarm&&agent?.batch?.length&&!synthesizing){node.versions[0].label='Final';retainedMessages=buildAPIMessages(null,messages,agent);const results=await Promise.all(agent.batch.map((entry,index)=>{const candidateAgent=typeof entry==='number'?{...agent,temperature:entry}:typeof entry==='string'?{...resolveAgent(entry)}:{...agent,...entry};return generateAIResponse(null,{node,agent:candidateAgent,messages,hidden:true,label:'Candidate '+(index+1)})}));if(results.some(result=>result.status<0)){Object.assign(node.versions[0],{isDead:true,errorIcon:'☠️',errorText:'Stopped by user',endTime:Date.now()});node.isGenerating=false;waitingToSave[node.id]=node;saveHistory();if(!background)updateNodeDOM(node);return {node,versionIndex:0,status:-1}}return generateAIResponse(null,{node,versionIndex:0,agent:resolveAgent(agent.synth)||{...agent,prompt:'Synthesize the candidates.'},messages:retainedMessages.concat(results.map((result,index)=>({role:'assistant',content:'[Candidate '+(index+1)+']\n'+(node.versions[result.versionIndex].rawContent||node.versions[result.versionIndex].errorText||'')}))),retainedMessages,swarm,background,synthesizing:true})}
+			}else if(versionIndex==null){versionIndex=node.versions.push(ver(node,{rawContent:'',thinking:'',isDead:false,agentId:agent?.id||'',label:label||'',temperature:agent?.temperature}))-1;node.isGenerating=true;waitingToSave[node.id]=node;if(!hidden&&!background){node.activeVersion=versionIndex;const pathIndex=activeViewList.findIndex(step=>step.id===node.id);if(pathIndex>-1){activeViewList[pathIndex].v=versionIndex;pushHistoryNext=1;saveActiveView()}updateNodeDOM(node)}saveHistory()}else{node.isGenerating=true;waitingToSave[node.id]=node;if(!hidden&&!background){node.activeVersion=versionIndex;updateNodeDOM(node)}saveHistory()}
+			versionIndex??=node.activeVersion;messages=buildAPIMessages(getViewNodes(),messages,agent);const status=await triggerAI(messages,node,versionIndex,agent);
+			if(status>0&&swarm){const carriedMessages=(retainedMessages||messages).concat({role:'assistant',content:node.versions[versionIndex].rawContent}), followingAgent=nextAgent(node);if(followingAgent)return generateAIResponse(node.id,{swarm:true,agent:followingAgent,messages:carriedMessages,background:getViewNodes().at(-1)?.id!==node.id})}return {node,versionIndex,status}
 		}
 		function sendMessage() {
 			const text = els.messageInput.value.trim(); if (!text || els.sendBtn.disabled) return;
 			els.messageInput.value = ''; els.messageInput.style.height = 'auto'; const path = getViewNodes(); const leafId = path.length > 0 ? path[path.length - 1].id : 'root';
 			if (leafId !== 'root') updateNodeDOM(chatTree.nodes[leafId]);
-			els.chatContainer.appendChild(createMessageDOM(createNode('user', text, '', leafId), true)); updatePathTracker(); updateSendBtn(); handleNewContent(text.length, true); generateAIResponse();
+			const userNode=createNode('user',text,'',leafId);els.chatContainer.appendChild(createMessageDOM(userNode,true));updatePathTracker();updateSendBtn();handleNewContent(text.length,true);settings.swarm?generateAIResponse(null,{swarm:true,agent:nextAgent(userNode),messages:buildAPIMessages(getViewNodes())}):generateAIResponse();
 		}
 		function withRawVersion(rawId, versionNum) { const s = String(rawId || ''); const p = s.indexOf('('); return p < 0 ? s.replace(/v\d+$/, '') + (versionNum > 1 ? `v${versionNum}` : '') : s.slice(0, p).replace(/v\d+$/, '') + (versionNum > 1 ? `v${versionNum}` : '') + s.slice(p); }
 		function showClashPopup(clashQueue, diskTree, targetChatId) {
@@ -1317,8 +1288,8 @@ $q('[id]').forEach(el => els[el.id] = el);
 				case 'copy': navigator.clipboard.writeText(node.versions[node.activeVersion].rawContent); showToast('Copied!'); break;
 				case 'edit': msgDiv.querySelector('.bubble').style.display = 'none'; msgDiv.querySelector('.edit-ui').style.display = 'flex'; msgDiv.querySelector('textarea').value = node.versions[node.activeVersion].rawContent || ''; msgDiv.querySelector('textarea').focus(); break;
 				case 'cancel-edit': msgDiv.querySelector('.edit-ui').style.display = 'none'; msgDiv.querySelector('.bubble').style.display = 'block'; break;
-				case 'update': pushHistoryNext=1; node.versions.push(ver(node,{ rawContent: msgDiv.querySelector('textarea').value, thinking: node.versions[node.activeVersion].thinking, isDead: false })); node.activeVersion = node.versions.length - 1; if(listIdx > -1) activeViewList[listIdx].v = node.activeVersion; commitNode(node); break;
-				case 'branch': pushHistoryNext=1; const newNode = createNode(node.role, msgDiv.querySelector('textarea').value, node.versions[node.activeVersion].thinking, node.parentId); if(listIdx > -1) rebuildViewArrayFrom(listIdx); renderPathFrom(newNode.id); if (newNode.role === 'user') generateAIResponse(); break;
+				case 'update': pushHistoryNext=1; {const version=node.versions[node.activeVersion];node.versions.push(ver(node,{rawContent:msgDiv.querySelector('textarea').value,thinking:version.thinking,isDead:false,agentId:version.agentId,label:version.label,temperature:version.temperature}))} node.activeVersion = node.versions.length - 1; if(listIdx > -1) activeViewList[listIdx].v = node.activeVersion; commitNode(node); break;
+				case 'branch': pushHistoryNext=1; {const version=node.versions[node.activeVersion];var newNode=createNode(node.role,msgDiv.querySelector('textarea').value,version.thinking,node.parentId,false,{agent:resolveAgent(version.agentId),label:version.label})} if(listIdx > -1) rebuildViewArrayFrom(listIdx); renderPathFrom(newNode.id); if (newNode.role === 'user') generateAIResponse(); break;
 				case 'refresh': {
 					let targetNode = node;
 					let path = getViewNodes();
@@ -1333,17 +1304,7 @@ $q('[id]').forEach(el => els[el.id] = el);
 							return;
 						}
 					}
-					targetNode.versions.push(ver(targetNode,{ rawContent: '', thinking: '', isDead: false }));
-					targetNode.activeVersion = targetNode.versions.length - 1;
-					targetNode.isGenerating = true;
-					const targetListIdx = activeViewList.findIndex(step => step.id === targetNode.id);
-					if (targetListIdx > -1) {
-						activeViewList[targetListIdx].v = targetNode.activeVersion;
-						pushHistoryNext=1;saveActiveView();
-					}
-					waitingToSave[targetNode.id] = targetNode;
-					updateNodeDOM(targetNode);
-					triggerAI(buildAPIMessages(path.slice(0, sliceIdx + 1)), targetNode, targetNode.activeVersion);
+					const version=targetNode.versions[targetNode.activeVersion], agent=resolveAgent(version.agentId);generateAIResponse(null,{node:targetNode,agent:version.temperature==null?agent:{...agent,temperature:version.temperature},label:version.label,messages:buildAPIMessages(path.slice(0,sliceIdx+1))});
 					break;
 				}
 				case 'v-prev': if (listIdx > 0 && activeViewList[listIdx].v > 0) { activeViewList[listIdx].v--; node.activeVersion = activeViewList[listIdx].v; node.versions[node.activeVersion].unread = false; pushHistoryNext=1; commitNode(node); } break;
