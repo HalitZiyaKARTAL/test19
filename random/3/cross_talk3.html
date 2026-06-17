@@ -1,0 +1,883 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Static WebRTC QR + note.ms Relay</title>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
+<style>
+:root{
+  --bg:#101018;--surface:#181825;--surface2:#202034;--text:#eee;--muted:#aaa;
+  --border:#444455;--good:#17351f;--bad:#3a1f1f;--warn:#3a3118;--btn:#22283a;
+}
+*{box-sizing:border-box}
+body{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--bg);color:var(--text);margin:0;padding:14px}
+.box{max-width:980px;margin:auto}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:12px;margin:12px 0}
+.row{display:flex;flex-wrap:wrap;gap:7px;align-items:center;margin:6px 0}
+button,input,textarea{font:inherit}
+button{padding:10px 12px;border:1px solid #555568;border-radius:10px;background:var(--btn);color:var(--text);cursor:pointer}
+button:active{transform:scale(.98)}
+button.primary{background:#263c68}
+button.good{background:#1f4a2a}
+button.danger{background:#4a2228}
+textarea{width:100%;min-height:105px;background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:10px;padding:10px;margin:8px 0;resize:vertical}
+input[type=text],input:not([type]){background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:10px;padding:10px}
+.wide{width:100%}
+.status{padding:12px;border-radius:12px;background:var(--bad);margin:10px 0;font-weight:800}
+.connected{background:var(--good)}
+.warn{background:var(--warn)}
+.hint,.small{color:var(--muted);font-size:.95em;line-height:1.35}
+pre{white-space:pre-wrap;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px;min-height:170px;max-height:45vh;overflow:auto}
+#localQr{background:white;color:black;display:none;padding:10px;border-radius:10px;width:max-content;max-width:100%;overflow:auto}
+#qrVideo{display:none;width:100%;max-height:45vh;border-radius:10px;background:#000;border:1px solid var(--border)}
+.pill{display:inline-block;padding:4px 8px;border:1px solid var(--border);border-radius:999px;color:var(--muted)}
+label{user-select:none}
+</style>
+</head>
+
+<body>
+<div class="box">
+  <h2>Static WebRTC QR + note.ms Relay</h2>
+  <div id="status" class="status">Not connected</div>
+
+  <div class="card">
+    <h3>Fast usage</h3>
+    <div class="hint">
+      Manual/QR: Device A makes host code → Device B scans/pastes it → Device B makes reply → Device A scans/pastes reply → finish.
+      <br><br>
+      Relay: use same note.ms link on both devices, enable <b>Use link intermediary</b>. It polls once per second and tries to auto exchange offer/answer.
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>1. Local code</h3>
+    <div class="row">
+      <button class="primary" onclick="makeHostCode()">Host: make code</button>
+      <button onclick="copyLocalCode()">Copy</button>
+      <button onclick="shareLocalCode()">Share</button>
+      <button onclick="makeLocalQr()">Make QR</button>
+      <button onclick="hideLocalQr()">Hide QR</button>
+      <button class="danger" onclick="clearAll()">Reset</button>
+    </div>
+    <textarea id="localCode" readonly placeholder="Your generated offer/answer code appears here"></textarea>
+    <div id="localQr"></div>
+    <div class="small">QR generation uses qrcodejs CDN for now. Replaceable later.</div>
+  </div>
+
+  <div class="card">
+    <h3>2. Remote code</h3>
+    <textarea id="remoteCode" placeholder="Paste or scan the other device's code here"></textarea>
+    <div class="row">
+      <button onclick="pasteRemoteCode()">Paste from clipboard</button>
+      <button onclick="startQrScan()">Read QR into paste box</button>
+      <button onclick="stopQrScan()">Stop QR scan</button>
+    </div>
+    <video id="qrVideo" playsinline muted></video>
+    <div class="row">
+      <button class="good" onclick="joinFromHostCode()">Join: make reply from pasted host code</button>
+      <button class="good" onclick="finishHostConnection()">Host: finish using pasted reply</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>3. note.ms relay</h3>
+
+    <div class="row">
+      <label><input id="relayOn" type="checkbox" onchange="setRelayEnabled(this.checked)"> Use link intermediary</label>
+      <span id="relayState" class="pill">relay off</span>
+    </div>
+
+    <label class="small">Relay URL</label>
+    <input id="relayUrl" class="wide" type="text" value="https://note.ms/connector20260617testing1">
+
+    <label class="small">Optional proxy template. Leave empty normally. Use <code>{url}</code>, or it appends encoded URL.</label>
+    <input id="proxyTemplate" class="wide" type="text" placeholder="example: https://your-worker.example/?url={url}">
+
+    <div class="row">
+      <button onclick="relayCheckOnce()">Check link once</button>
+      <button onclick="relayPublishLocal()">Write my current local code</button>
+      <button onclick="relayAutoStartAsHost()">Auto host publish now</button>
+      <button onclick="relayNoteMsSelfTest()">Test note.ms read/write</button>
+      <button onclick="relayClearRemote()">Try clear relay page</button>
+    </div>
+
+    <div class="hint">
+      note.ms writing is attempted by CORS POST first, then hidden form POST. Reading needs CORS or a proxy.
+      If direct read fails but manual note.ms works, use a proxy template later.
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>4. Test channel</h3>
+    <div class="row">
+      <button class="primary" onclick="sendPing()">Ping</button>
+      <input id="customText" placeholder="hello" style="flex:1;min-width:160px">
+      <button onclick="sendText()">Send text</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Log</h3>
+    <pre id="log"></pre>
+  </div>
+</div>
+
+<script>
+/* -----------------------------
+   State
+----------------------------- */
+
+let pc=null, channel=null;
+let pendingPings=new Map();
+
+const peerId="p"+Math.random().toString(36).slice(2,10);
+
+const statusEl=document.getElementById("status");
+const logEl=document.getElementById("log");
+const localCodeEl=document.getElementById("localCode");
+const remoteCodeEl=document.getElementById("remoteCode");
+const relayStateEl=document.getElementById("relayState");
+
+const rtcConfig={iceServers:[{urls:"stun:stun.l.google.com:19302"}]};
+
+function log(text){
+  logEl.textContent+="["+new Date().toLocaleTimeString()+"] "+text+"\n";
+  logEl.scrollTop=logEl.scrollHeight;
+}
+function setStatus(text,connected=false,warn=false){
+  statusEl.textContent=text;
+  statusEl.className=connected?"status connected":warn?"status warn":"status";
+}
+function setRelayState(text){relayStateEl.textContent=text}
+function connected(){return channel&&channel.readyState==="open"}
+function sleep(ms){return new Promise(r=>setTimeout(r,ms))}
+
+/* -----------------------------
+   Code encode/decode
+----------------------------- */
+
+function bytesToBase64Url(bytes){
+  let binary="";
+  for(const byte of bytes)binary+=String.fromCharCode(byte);
+  return btoa(binary).replaceAll("+","-").replaceAll("/","_").replaceAll("=","");
+}
+function base64UrlToBytes(text){
+  text=text.replaceAll("-","+").replaceAll("_","/");
+  text+="=".repeat((4-text.length%4)%4);
+  const binary=atob(text);
+  return Uint8Array.from(binary,ch=>ch.charCodeAt(0));
+}
+function encodeCode(obj){
+  const bytes=new TextEncoder().encode(JSON.stringify(obj));
+  return "WEBRTC-PING-v1:"+bytesToBase64Url(bytes);
+}
+function decodeCode(text){
+  text=text.trim();
+  if(text.startsWith("WEBRTC-PING-v1:"))text=text.slice("WEBRTC-PING-v1:".length);
+  const bytes=base64UrlToBytes(text);
+  return JSON.parse(new TextDecoder().decode(bytes));
+}
+function shortCodeInfo(text){return text?text.length+" chars":"empty"}
+
+/* -----------------------------
+   WebRTC
+----------------------------- */
+
+function makePeer(){
+  pc=new RTCPeerConnection(rtcConfig);
+
+  pc.oniceconnectionstatechange=()=>log("ICE state: "+pc.iceConnectionState);
+  pc.onconnectionstatechange=()=>log("Peer state: "+pc.connectionState);
+
+  pc.ondatachannel=event=>{
+    channel=event.channel;
+    setupChannel();
+    log("Received data channel.");
+  };
+}
+
+function setupChannel(){
+  channel.onopen=()=>{
+    setStatus("CONNECTED — DataChannel open",true);
+    log("DataChannel opened.");
+  };
+  channel.onclose=()=>{
+    setStatus("Disconnected");
+    log("DataChannel closed.");
+  };
+  channel.onerror=e=>{
+    log("DataChannel error.");
+    console.error(e);
+  };
+  channel.onmessage=event=>{
+    let msg;
+    try{msg=JSON.parse(event.data)}catch{
+      log("Received raw: "+event.data);
+      return;
+    }
+
+    if(msg.type==="ping"){
+      log("Received ping: "+msg.id);
+      channel.send(JSON.stringify({type:"pong",id:msg.id,time:Date.now()}));
+      return;
+    }
+
+    if(msg.type==="pong"){
+      const started=pendingPings.get(msg.id);
+      pendingPings.delete(msg.id);
+      log(started
+        ? "Received pong: "+msg.id+" | RTT ≈ "+Math.round(performance.now()-started)+" ms"
+        : "Received pong: "+msg.id);
+      return;
+    }
+
+    if(msg.type==="text"){
+      log("Received text: "+msg.text);
+      return;
+    }
+
+    log("Received unknown message: "+event.data);
+  };
+}
+
+async function waitForIceGatheringComplete(){
+  if(pc.iceGatheringState==="complete")return;
+
+  await new Promise(resolve=>{
+    let done=false;
+    const finish=()=>{if(done)return;done=true;resolve()};
+    pc.addEventListener("icegatheringstatechange",()=>{if(pc.iceGatheringState==="complete")finish()});
+    pc.addEventListener("icecandidate",event=>{if(!event.candidate)finish()});
+    setTimeout(finish,5000);
+  });
+}
+
+async function makeHostCode(){
+  clearConnectionOnly();
+
+  makePeer();
+  channel=pc.createDataChannel("ping");
+  setupChannel();
+
+  log("Creating host offer...");
+  const offer=await pc.createOffer();
+  await pc.setLocalDescription(offer);
+  await waitForIceGatheringComplete();
+
+  localCodeEl.value=encodeCode(pc.localDescription);
+  log("Host code created: "+shortCodeInfo(localCodeEl.value)+".");
+}
+
+async function joinFromHostCode(){
+  clearConnectionOnly();
+  makePeer();
+
+  let hostOffer;
+  try{hostOffer=decodeCode(remoteCodeEl.value)}
+  catch(err){log("Bad host code: "+err.message);return}
+
+  log("Reading host code...");
+  await pc.setRemoteDescription(hostOffer);
+
+  log("Creating reply code...");
+  const answer=await pc.createAnswer();
+  await pc.setLocalDescription(answer);
+  await waitForIceGatheringComplete();
+
+  localCodeEl.value=encodeCode(pc.localDescription);
+  log("Reply code created: "+shortCodeInfo(localCodeEl.value)+".");
+}
+
+async function finishHostConnection(){
+  if(!pc){log("No host peer exists. First click Host: make code.");return}
+
+  let answer;
+  try{answer=decodeCode(remoteCodeEl.value)}
+  catch(err){log("Bad answer code: "+err.message);return}
+
+  log("Applying reply code...");
+  await pc.setRemoteDescription(answer);
+  log("Reply accepted. Waiting for DataChannel open...");
+}
+
+function sendPing(){
+  if(!connected()){log("Cannot ping: not connected yet.");return}
+  const id=Math.random().toString(36).slice(2);
+  pendingPings.set(id,performance.now());
+  channel.send(JSON.stringify({type:"ping",id,time:Date.now()}));
+  log("Sent ping: "+id);
+}
+
+function sendText(){
+  if(!connected()){log("Cannot send: not connected yet.");return}
+  const text=document.getElementById("customText").value||"hello";
+  channel.send(JSON.stringify({type:"text",text,time:Date.now()}));
+  log("Sent text: "+text);
+}
+
+function clearConnectionOnly(){
+  if(channel){try{channel.close()}catch{}}
+  if(pc){try{pc.close()}catch{}}
+  pc=null;
+  channel=null;
+  pendingPings.clear();
+  setStatus("Not connected");
+}
+
+function clearAll(){
+  stopQrScan();
+  setRelayEnabled(false);
+  document.getElementById("relayOn").checked=false;
+
+  clearConnectionOnly();
+  localCodeEl.value="";
+  remoteCodeEl.value="";
+  hideLocalQr();
+  logEl.textContent="";
+
+  relaySeen.clear();
+  relayOutbox.length=0;
+  relayMadeOffer=false;
+  relayHelloQueued=false;
+  relayAnsweredOfferIds.clear();
+  relayAppliedAnswerIds.clear();
+  relayLastState=null;
+
+  log("Reset. My peer id: "+peerId);
+}
+
+/* -----------------------------
+   Clipboard/share
+----------------------------- */
+
+async function copyLocalCode(){
+  const text=localCodeEl.value;
+  if(!text){log("No local code to copy.");return}
+  try{await navigator.clipboard.writeText(text);log("Copied local code.")}
+  catch{
+    localCodeEl.select();
+    document.execCommand("copy");
+    log("Tried fallback copy.");
+  }
+}
+
+async function pasteRemoteCode(){
+  try{
+    remoteCodeEl.value=await navigator.clipboard.readText();
+    log("Pasted clipboard into remote code box.");
+  }catch(err){log("Clipboard paste failed: "+err.name+". Paste manually.")}
+}
+
+async function shareLocalCode(){
+  const text=localCodeEl.value.trim();
+  if(!text){log("No local code to share.");return}
+  if(!navigator.share){log("Web Share not available. Use Copy.");return}
+  try{await navigator.share({title:"WebRTC connection code",text});log("Share sheet opened.")}
+  catch(err){log("Share cancelled/failed: "+err.name)}
+}
+
+/* -----------------------------
+   QR make/read
+----------------------------- */
+
+function makeLocalQr(){
+  const text=localCodeEl.value.trim();
+  if(!text){log("No local code to make QR from.");return}
+  if(!window.QRCode){log("QRCode library not loaded.");return}
+
+  const box=document.getElementById("localQr");
+  box.innerHTML="";
+  box.style.display="inline-block";
+
+  try{
+    new QRCode(box,{text,width:320,height:320,correctLevel:QRCode.CorrectLevel.L});
+    log("QR made from local code: "+shortCodeInfo(text)+".");
+  }catch(err){
+    box.style.display="none";
+    log("QR generation failed: "+err.message);
+  }
+}
+
+function hideLocalQr(){
+  const box=document.getElementById("localQr");
+  box.innerHTML="";
+  box.style.display="none";
+}
+
+let qrStream=null,qrDetector=null,qrScanning=false;
+
+async function startQrScan(){
+  if(!("BarcodeDetector" in globalThis)){log("Native QR reader not supported. Use paste fallback.");return}
+
+  try{qrDetector=new BarcodeDetector({formats:["qr_code"]})}
+  catch(err){log("BarcodeDetector failed: "+err.message);return}
+
+  const video=document.getElementById("qrVideo");
+  video.style.display="block";
+
+  try{
+    qrStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:"environment"},audio:false});
+  }catch(err){
+    log("Camera failed: "+err.name+". Use paste fallback.");
+    video.style.display="none";
+    return;
+  }
+
+  video.srcObject=qrStream;
+  await video.play();
+
+  qrScanning=true;
+  log("QR scanner started.");
+  scanQrLoop();
+}
+
+async function scanQrLoop(){
+  if(!qrScanning||!qrDetector)return;
+  const video=document.getElementById("qrVideo");
+
+  try{
+    if(video.readyState>=2){
+      const results=await qrDetector.detect(video);
+      if(results.length){
+        remoteCodeEl.value=results[0].rawValue||"";
+        log("QR read into remote-code box: "+shortCodeInfo(remoteCodeEl.value)+".");
+        stopQrScan();
+        return;
+      }
+    }
+  }catch(err){log("QR detect error: "+err.name)}
+
+  requestAnimationFrame(scanQrLoop);
+}
+
+function stopQrScan(){
+  qrScanning=false;
+  const video=document.getElementById("qrVideo");
+  video.pause();
+  video.style.display="none";
+
+  if(qrStream){
+    for(const track of qrStream.getTracks())track.stop();
+    qrStream=null;
+  }
+
+  if(qrDetector)log("QR scanner stopped.");
+  qrDetector=null;
+}
+
+/* -----------------------------
+   note.ms relay
+----------------------------- */
+
+const RELAY_START="STATIC_WEBRTC_RELAY_V1_START";
+const RELAY_END="STATIC_WEBRTC_RELAY_V1_END";
+
+let relayTimer=null;
+let relayBusy=false;
+let relayLastState=null;
+let relayHelloQueued=false;
+let relayMadeOffer=false;
+
+const relaySeen=new Set();
+const relayOutbox=[];
+const relayAnsweredOfferIds=new Set();
+const relayAppliedAnswerIds=new Set();
+
+function normalizeRelayUrl(url){
+  url=url.trim();
+  if(!/^https?:\/\//i.test(url))url="https://"+url;
+  return url;
+}
+function relayUrl(){return normalizeRelayUrl(document.getElementById("relayUrl").value)}
+function proxyTemplate(){return document.getElementById("proxyTemplate").value.trim()}
+function networkUrl(rawUrl){
+  const p=proxyTemplate();
+  if(!p)return rawUrl;
+  return p.includes("{url}")?p.replace("{url}",encodeURIComponent(rawUrl)):p+encodeURIComponent(rawUrl);
+}
+
+function emptyRelayState(){
+  return {app:"static-webrtc-ping",version:1,updated:Date.now(),messages:[]};
+}
+
+function htmlDecode(text){
+  const box=document.createElement("textarea");
+  box.innerHTML=text;
+  return box.value;
+}
+
+function extractNoteMsContent(html){
+  // Some proxies return JSON wrappers.
+  try{
+    const obj=JSON.parse(html);
+    if(typeof obj.contents==="string")html=obj.contents;
+    else if(typeof obj.body==="string")html=obj.body;
+    else if(typeof obj.data==="string")html=obj.data;
+  }catch{}
+
+  let m=html.match(/<textarea[^>]*class=["'][^"']*\bcontent\b[^"']*["'][^>]*>([\s\S]*?)<\/textarea>/i);
+  if(!m)m=html.match(/<textarea[^>]*>([\s\S]*?)<\/textarea>/i);
+  if(m)return htmlDecode(m[1]);
+
+  if(html.includes(RELAY_START)&&html.includes(RELAY_END))return html;
+  return "";
+}
+
+function parseRelayState(text){
+  const start=text.indexOf(RELAY_START);
+  const end=text.indexOf(RELAY_END);
+
+  if(start>=0&&end>start){
+    const inside=text.slice(start+RELAY_START.length,end).trim();
+    try{
+      const obj=JSON.parse(inside);
+      if(obj&&obj.app==="static-webrtc-ping"){
+        if(!Array.isArray(obj.messages))obj.messages=[];
+        return obj;
+      }
+    }catch{}
+  }
+
+  const first=text.indexOf("{");
+  const last=text.lastIndexOf("}");
+  if(first>=0&&last>first){
+    try{
+      const obj=JSON.parse(text.slice(first,last+1));
+      if(obj&&obj.app==="static-webrtc-ping"){
+        if(!Array.isArray(obj.messages))obj.messages=[];
+        return obj;
+      }
+    }catch{}
+  }
+
+  return emptyRelayState();
+}
+
+function serializeRelayState(state){
+  const seen=new Set();
+  state.messages=state.messages
+    .filter(m=>m&&m.id&&!seen.has(m.id)&&seen.add(m.id))
+    .sort((a,b)=>a.ts-b.ts)
+    .slice(-60);
+  state.updated=Date.now();
+
+  return RELAY_START+"\n"+JSON.stringify(state,null,2)+"\n"+RELAY_END+"\n";
+}
+
+async function relayReadText(){
+  const raw=relayUrl();
+  const url=networkUrl(raw);
+  const sep=url.includes("?")?"&":"?";
+
+  const r=await fetch(url+sep+"_="+Date.now(),{
+    method:"GET",
+    cache:"no-store",
+    mode:"cors"
+  });
+
+  if(!r.ok)throw new Error("note.ms read HTTP "+r.status);
+
+  const html=await r.text();
+  const content=extractNoteMsContent(html);
+  log("note.ms read: page "+html.length+" chars, note content "+content.length+" chars.");
+  return content;
+}
+
+function relayWriteByHiddenForm(text){
+  return new Promise(resolve=>{
+    const id="notePost_"+Math.random().toString(36).slice(2);
+    const iframe=document.createElement("iframe");
+    iframe.name=id;
+    iframe.style.display="none";
+
+    const form=document.createElement("form");
+    form.method="POST";
+    form.action=relayUrl();
+    form.target=id;
+    form.enctype="application/x-www-form-urlencoded";
+    form.style.display="none";
+
+    const input=document.createElement("textarea");
+    input.name="t";
+    input.value=text;
+
+    form.appendChild(input);
+    document.body.appendChild(iframe);
+    document.body.appendChild(form);
+
+    let done=false;
+    const finish=why=>{
+      if(done)return;
+      done=true;
+      setTimeout(()=>{
+        try{form.remove()}catch{}
+        try{iframe.remove()}catch{}
+      },250);
+      log("note.ms hidden form POST finished/assumed: "+why);
+      resolve();
+    };
+
+    iframe.onload=()=>finish("iframe load");
+    setTimeout(()=>finish("timeout fallback"),1800);
+    form.submit();
+  });
+}
+
+async function relayWriteText(text){
+  const raw=relayUrl();
+  const url=networkUrl(raw);
+  const body="t="+encodeURIComponent(text);
+
+  try{
+    const r=await fetch(url,{
+      method:"POST",
+      mode:"cors",
+      headers:{"Content-Type":"application/x-www-form-urlencoded;charset=UTF-8"},
+      body
+    });
+
+    if(r.ok){
+      log("note.ms write: CORS/proxy POST confirmed.");
+      return;
+    }
+
+    log("note.ms POST returned HTTP "+r.status+". Trying hidden form POST direct.");
+  }catch(err){
+    log("note.ms CORS/proxy POST failed: "+err.message+". Trying hidden form POST direct.");
+  }
+
+  await relayWriteByHiddenForm(text);
+}
+
+async function relayGetState(){
+  try{
+    const text=await relayReadText();
+    relayLastState=parseRelayState(text);
+    log("Relay parsed messages: "+relayLastState.messages.length);
+    return relayLastState;
+  }catch(err){
+    log("Relay read failed: "+err.message);
+    return relayLastState||emptyRelayState();
+  }
+}
+
+async function relaySaveState(state){
+  const text=serializeRelayState(state);
+  try{
+    await relayWriteText(text);
+    relayLastState=state;
+    return true;
+  }catch(err){
+    log("Relay write failed: "+err.message);
+    return false;
+  }
+}
+
+function relayQueue(kind,data,to="*",replyTo=null){
+  const msg={id:Math.random().toString(36).slice(2),from:peerId,to,kind,data,replyTo,ts:Date.now()};
+  relayOutbox.push(msg);
+  relaySeen.add(msg.id);
+  log("Relay queued "+kind+".");
+  return msg;
+}
+
+function relayMergeOutbox(state){
+  let changed=false;
+  const existing=new Set(state.messages.map(m=>m.id));
+  for(const msg of relayOutbox){
+    if(!existing.has(msg.id)){
+      state.messages.push(msg);
+      existing.add(msg.id);
+      changed=true;
+    }
+  }
+  return changed;
+}
+
+function relayQueueHelloOnce(){
+  if(relayHelloQueued)return;
+  relayHelloQueued=true;
+  relayQueue("hello",{ua:navigator.userAgent.slice(0,120),created:Date.now()});
+}
+
+function chooseCanonicalOffer(messages){
+  const offers=messages
+    .filter(m=>m.kind==="offer"&&m.data&&m.data.type==="offer")
+    .sort((a,b)=>String(a.from).localeCompare(String(b.from))||a.ts-b.ts);
+  return offers[0]||null;
+}
+
+async function relayProcessState(state){
+  relayQueueHelloOnce();
+
+  const canonicalOffer=chooseCanonicalOffer(state.messages);
+
+  if(!canonicalOffer){
+    if(!relayMadeOffer&&!pc&&!connected()){
+      log("Relay found no offer. I will become host and publish offer.");
+      await makeHostCode();
+
+      let offer;
+      try{offer=decodeCode(localCodeEl.value)}
+      catch(err){log("Could not decode my generated offer: "+err.message);return}
+
+      relayMadeOffer=true;
+      relayQueue("offer",offer);
+    }
+    return;
+  }
+
+  if(canonicalOffer.from!==peerId){
+    if(connected())return;
+    if(relayAnsweredOfferIds.has(canonicalOffer.id))return;
+
+    relayAnsweredOfferIds.add(canonicalOffer.id);
+    log("Relay saw canonical offer from "+canonicalOffer.from+". I will answer it.");
+
+    clearConnectionOnly();
+    remoteCodeEl.value=encodeCode(canonicalOffer.data);
+    await joinFromHostCode();
+
+    let answer;
+    try{answer=decodeCode(localCodeEl.value)}
+    catch(err){log("Could not decode my answer: "+err.message);return}
+
+    relayQueue("answer",answer,canonicalOffer.from,canonicalOffer.id);
+    return;
+  }
+
+  const answers=state.messages
+    .filter(m=>m.kind==="answer"&&m.to===peerId&&m.replyTo===canonicalOffer.id&&m.data&&m.data.type==="answer")
+    .sort((a,b)=>a.ts-b.ts);
+
+  for(const answer of answers){
+    if(relayAppliedAnswerIds.has(answer.id))continue;
+    if(connected())return;
+
+    relayAppliedAnswerIds.add(answer.id);
+    log("Relay saw answer from "+answer.from+". Applying as host.");
+    remoteCodeEl.value=encodeCode(answer.data);
+
+    try{await finishHostConnection()}
+    catch(err){log("Applying relay answer failed: "+err.message)}
+
+    return;
+  }
+}
+
+async function relayCheckOnce(){
+  if(relayBusy){log("Relay check skipped: previous check still running.");return}
+
+  relayBusy=true;
+  setRelayState("checking...");
+
+  try{
+    const state=await relayGetState();
+    await relayProcessState(state);
+
+    const changed=relayMergeOutbox(state);
+    if(changed){
+      setRelayState("writing...");
+      const saved=await relaySaveState(state);
+      if(saved)relayOutbox.length=0;
+    }
+
+    setRelayState("relay on | outbox "+relayOutbox.length+" | msgs "+state.messages.length);
+  }catch(err){
+    setRelayState("relay error");
+    log("Relay check failed: "+err.message);
+  }finally{
+    relayBusy=false;
+  }
+}
+
+function setRelayEnabled(on){
+  if(on){
+    if(relayTimer)clearInterval(relayTimer);
+    setRelayState("relay on");
+    log("Relay auto ON. Peer id: "+peerId+". Link: "+relayUrl());
+    if(proxyTemplate())log("Proxy template active: "+proxyTemplate());
+    relayTimer=setInterval(relayCheckOnce,1000);
+    relayCheckOnce();
+  }else{
+    if(relayTimer)clearInterval(relayTimer);
+    relayTimer=null;
+    setRelayState("relay off");
+    log("Relay auto OFF.");
+  }
+}
+
+async function relayPublishLocal(){
+  if(!localCodeEl.value.trim()){log("No local code to publish.");return}
+
+  let data;
+  try{data=decodeCode(localCodeEl.value)}
+  catch(err){log("Could not decode local code: "+err.message);return}
+
+  relayQueue(data.type,data);
+  await relayCheckOnce();
+}
+
+async function relayAutoStartAsHost(){
+  if(connected()){log("Already connected.");return}
+  if(!localCodeEl.value.trim())await makeHostCode();
+
+  let offer;
+  try{offer=decodeCode(localCodeEl.value)}
+  catch(err){log("Could not decode local offer: "+err.message);return}
+
+  if(offer.type!=="offer"){log("Local code is not an offer.");return}
+
+  relayMadeOffer=true;
+  relayQueue("offer",offer);
+  await relayCheckOnce();
+}
+
+async function relayClearRemote(){
+  const ok=confirm("Try to overwrite the relay note with an empty relay state?");
+  if(!ok)return;
+
+  const state=emptyRelayState();
+  relayLastState=state;
+  await relaySaveState(state);
+}
+
+async function relayNoteMsSelfTest(){
+  const marker="NOTE_MS_TEST_"+Date.now()+"_"+Math.random().toString(36).slice(2);
+  const testText=RELAY_START+"\n"+JSON.stringify({
+    app:"static-webrtc-ping",
+    version:1,
+    updated:Date.now(),
+    messages:[{id:marker,from:peerId,to:"*",kind:"test",data:marker,ts:Date.now()}]
+  },null,2)+"\n"+RELAY_END+"\n";
+
+  log("note.ms self-test: writing marker "+marker);
+  await relayWriteText(testText);
+
+  log("note.ms self-test: waiting before read...");
+  await sleep(2500);
+
+  try{
+    const back=await relayReadText();
+    if(back.includes(marker))log("note.ms self-test SUCCESS: marker came back.");
+    else log("note.ms self-test PARTIAL: marker not found. Read length: "+back.length+". Check note manually.");
+  }catch(err){
+    log("note.ms self-test READ FAILED: "+err.message);
+    log("If manual note changed, write works but read needs proxy/CORS.");
+  }
+}
+
+/* -----------------------------
+   Init
+----------------------------- */
+
+log("Loaded. Peer id: "+peerId);
+log("Manual copy/paste remains fallback.");
+log("QR make uses qrcodejs CDN. QR read uses native BarcodeDetector if supported.");
+log("Relay default: "+relayUrl());
+</script>
+</body>
+</html>
