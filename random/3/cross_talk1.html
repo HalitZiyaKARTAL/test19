@@ -1,0 +1,397 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Static HTML P2P Ping</title>
+<style>
+  body {
+    font-family: system-ui, sans-serif;
+    background: #101018;
+    color: #eee;
+    margin: 0;
+    padding: 16px;
+  }
+
+  .box {
+    max-width: 900px;
+    margin: auto;
+  }
+
+  button, textarea, input {
+    font: inherit;
+  }
+
+  button {
+    padding: 10px 12px;
+    margin: 4px;
+    border: 1px solid #555;
+    border-radius: 10px;
+    background: #22283a;
+    color: #eee;
+  }
+
+  button:active {
+    transform: scale(0.98);
+  }
+
+  textarea {
+    width: 100%;
+    min-height: 120px;
+    box-sizing: border-box;
+    background: #181825;
+    color: #eee;
+    border: 1px solid #444;
+    border-radius: 10px;
+    padding: 10px;
+    margin: 8px 0;
+  }
+
+  .status {
+    padding: 12px;
+    border-radius: 10px;
+    background: #2a1f1f;
+    margin: 10px 0;
+    font-weight: 700;
+  }
+
+  .connected {
+    background: #17351f;
+  }
+
+  pre {
+    white-space: pre-wrap;
+    background: #181825;
+    border-radius: 10px;
+    padding: 10px;
+    min-height: 100px;
+  }
+
+  .row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .hint {
+    color: #aaa;
+    font-size: 0.95em;
+  }
+</style>
+</head>
+<body>
+<div class="box">
+  <h2>Static HTML P2P Ping</h2>
+
+  <div id="status" class="status">Not connected</div>
+
+  <h3>1. Connection code made by this device</h3>
+  <div class="row">
+    <button onclick="makeHostCode()">Host: make code</button>
+    <button onclick="copyLocalCode()">Copy my code</button>
+    <button onclick="clearAll()">Reset</button>
+  </div>
+  <textarea id="localCode" readonly placeholder="Your generated code appears here"></textarea>
+
+  <h3>2. Paste code from other device</h3>
+  <textarea id="remoteCode" placeholder="Paste the other device's code here"></textarea>
+
+  <div class="row">
+    <button onclick="joinFromHostCode()">Join: make reply from pasted host code</button>
+    <button onclick="finishHostConnection()">Host: finish using pasted reply</button>
+  </div>
+
+  <h3>3. Test</h3>
+  <div class="row">
+    <button onclick="sendPing()">Ping</button>
+    <button onclick="sendText()">Send custom text</button>
+    <input id="customText" placeholder="hello">
+  </div>
+
+  <p class="hint">
+    Flow: Device A clicks Host → sends code to Device B → Device B pastes and clicks Join →
+    sends reply code back → Device A pastes reply and clicks Finish.
+  </p>
+
+  <h3>Log</h3>
+  <pre id="log"></pre>
+</div>
+
+<script>
+let pc = null;
+let channel = null;
+let pendingPings = new Map();
+
+const statusEl = document.getElementById("status");
+const logEl = document.getElementById("log");
+const localCodeEl = document.getElementById("localCode");
+const remoteCodeEl = document.getElementById("remoteCode");
+
+const rtcConfig = {
+  iceServers: [
+    { urls: "stun:stun.l.google.com:19302" }
+  ]
+};
+
+function log(text) {
+  logEl.textContent += `[${new Date().toLocaleTimeString()}] ${text}\n`;
+  logEl.scrollTop = logEl.scrollHeight;
+}
+
+function setStatus(text, connected = false) {
+  statusEl.textContent = text;
+  statusEl.className = connected ? "status connected" : "status";
+}
+
+function encodeCode(obj) {
+  const text = JSON.stringify(obj);
+  const bytes = new TextEncoder().encode(text);
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+
+  return "WEBRTC-PING-v1:" + btoa(binary)
+    .replaceAll("+", "-")
+    .replaceAll("/", "_")
+    .replaceAll("=", "");
+}
+
+function decodeCode(text) {
+  text = text.trim();
+
+  if (text.startsWith("WEBRTC-PING-v1:")) {
+    text = text.slice("WEBRTC-PING-v1:".length);
+  }
+
+  text = text.replaceAll("-", "+").replaceAll("_", "/");
+  text += "=".repeat((4 - text.length % 4) % 4);
+
+  const binary = atob(text);
+  const bytes = Uint8Array.from(binary, ch => ch.charCodeAt(0));
+  return JSON.parse(new TextDecoder().decode(bytes));
+}
+
+function makePeer() {
+  pc = new RTCPeerConnection(rtcConfig);
+
+  pc.oniceconnectionstatechange = () => {
+    log("ICE state: " + pc.iceConnectionState);
+  };
+
+  pc.onconnectionstatechange = () => {
+    log("Peer state: " + pc.connectionState);
+  };
+
+  pc.ondatachannel = event => {
+    channel = event.channel;
+    setupChannel();
+    log("Received data channel");
+  };
+}
+
+function setupChannel() {
+  channel.onopen = () => {
+    setStatus("CONNECTED — data channel open", true);
+    log("DataChannel opened");
+  };
+
+  channel.onclose = () => {
+    setStatus("Disconnected");
+    log("DataChannel closed");
+  };
+
+  channel.onerror = event => {
+    log("DataChannel error");
+    console.error(event);
+  };
+
+  channel.onmessage = event => {
+    let msg;
+
+    try {
+      msg = JSON.parse(event.data);
+    } catch {
+      log("Received raw: " + event.data);
+      return;
+    }
+
+    if (msg.type === "ping") {
+      log("Received ping: " + msg.id);
+      channel.send(JSON.stringify({
+        type: "pong",
+        id: msg.id,
+        time: Date.now()
+      }));
+      return;
+    }
+
+    if (msg.type === "pong") {
+      const started = pendingPings.get(msg.id);
+      pendingPings.delete(msg.id);
+
+      if (started) {
+        log("Received pong: " + msg.id + " | RTT ≈ " + Math.round(performance.now() - started) + " ms");
+      } else {
+        log("Received pong: " + msg.id);
+      }
+      return;
+    }
+
+    if (msg.type === "text") {
+      log("Received text: " + msg.text);
+      return;
+    }
+
+    log("Received unknown message: " + event.data);
+  };
+}
+
+async function waitForIceGatheringComplete() {
+  if (pc.iceGatheringState === "complete") return;
+
+  await new Promise(resolve => {
+    let done = false;
+
+    const finish = () => {
+      if (done) return;
+      done = true;
+      resolve();
+    };
+
+    pc.addEventListener("icegatheringstatechange", () => {
+      if (pc.iceGatheringState === "complete") finish();
+    });
+
+    pc.addEventListener("icecandidate", event => {
+      if (!event.candidate) finish();
+    });
+
+    setTimeout(finish, 5000);
+  });
+}
+
+async function makeHostCode() {
+  clearConnectionOnly();
+
+  makePeer();
+  channel = pc.createDataChannel("ping");
+  setupChannel();
+
+  log("Creating host offer...");
+  const offer = await pc.createOffer();
+  await pc.setLocalDescription(offer);
+  await waitForIceGatheringComplete();
+
+  localCodeEl.value = encodeCode(pc.localDescription);
+  log("Host code created. Send it to the other device.");
+}
+
+async function joinFromHostCode() {
+  clearConnectionOnly();
+
+  makePeer();
+
+  const hostOffer = decodeCode(remoteCodeEl.value);
+
+  log("Reading host code...");
+  await pc.setRemoteDescription(hostOffer);
+
+  log("Creating reply code...");
+  const answer = await pc.createAnswer();
+  await pc.setLocalDescription(answer);
+  await waitForIceGatheringComplete();
+
+  localCodeEl.value = encodeCode(pc.localDescription);
+  log("Reply code created. Send it back to the host device.");
+}
+
+async function finishHostConnection() {
+  if (!pc) {
+    log("No host peer exists. First click 'Host: make code'.");
+    return;
+  }
+
+  const answer = decodeCode(remoteCodeEl.value);
+
+  log("Applying reply code...");
+  await pc.setRemoteDescription(answer);
+  log("Reply accepted. Waiting for DataChannel open...");
+}
+
+function sendPing() {
+  if (!channel || channel.readyState !== "open") {
+    log("Cannot ping: not connected yet.");
+    return;
+  }
+
+  const id = Math.random().toString(36).slice(2);
+  pendingPings.set(id, performance.now());
+
+  channel.send(JSON.stringify({
+    type: "ping",
+    id,
+    time: Date.now()
+  }));
+
+  log("Sent ping: " + id);
+}
+
+function sendText() {
+  if (!channel || channel.readyState !== "open") {
+    log("Cannot send: not connected yet.");
+    return;
+  }
+
+  const text = document.getElementById("customText").value || "hello";
+
+  channel.send(JSON.stringify({
+    type: "text",
+    text,
+    time: Date.now()
+  }));
+
+  log("Sent text: " + text);
+}
+
+async function copyLocalCode() {
+  const text = localCodeEl.value;
+
+  if (!text) {
+    log("No local code to copy.");
+    return;
+  }
+
+  try {
+    await navigator.clipboard.writeText(text);
+    log("Copied code.");
+  } catch {
+    localCodeEl.select();
+    document.execCommand("copy");
+    log("Tried fallback copy. If it failed, select and copy manually.");
+  }
+}
+
+function clearConnectionOnly() {
+  if (channel) {
+    try { channel.close(); } catch {}
+  }
+
+  if (pc) {
+    try { pc.close(); } catch {}
+  }
+
+  pc = null;
+  channel = null;
+  pendingPings.clear();
+  setStatus("Not connected");
+}
+
+function clearAll() {
+  clearConnectionOnly();
+  localCodeEl.value = "";
+  remoteCodeEl.value = "";
+  logEl.textContent = "";
+  log("Reset.");
+}
+</script>
+</body>
+</html>
