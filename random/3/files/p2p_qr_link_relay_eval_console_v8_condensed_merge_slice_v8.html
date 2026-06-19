@@ -1,0 +1,448 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>P2P WebRTC v8 Condensed Merge Slice</title>
+<style>
+:root{--bg:#101018;--panel:#181824;--panel2:#202034;--text:#eee;--muted:#aaa;--border:#44445a;--good:#17351f;--bad:#3a1f1f;--warn:#3a3118;--blue:#263c68;--green:#1f4a2a;--red:#4a2228}
+*{box-sizing:border-box}body{margin:0;padding:14px;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}.box{max-width:1120px;margin:auto}.card{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:12px;margin:12px 0}.grid{display:grid;grid-template-columns:1fr;gap:12px}@media(min-width:900px){.grid.two{grid-template-columns:1fr 1fr}.grid.three{grid-template-columns:1fr 1fr 1fr}}
+.row{display:flex;flex-wrap:wrap;gap:7px;align-items:center;margin:7px 0}button,input,textarea,select{font:inherit}button{padding:9px 11px;border:1px solid #555568;border-radius:10px;background:#22283a;color:var(--text);cursor:pointer}button:active{transform:scale(.98)}button.primary{background:var(--blue)}button.good{background:var(--green)}button.danger{background:var(--red)}input[type=text],input:not([type]){background:var(--panel2);color:var(--text);border:1px solid var(--border);border-radius:10px;padding:9px}textarea{width:100%;min-height:110px;background:var(--panel2);color:var(--text);border:1px solid var(--border);border-radius:10px;padding:10px;resize:vertical}.code{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:13px;line-height:1.35;min-height:160px}pre{white-space:pre-wrap;background:var(--panel2);border:1px solid var(--border);border-radius:10px;padding:10px;min-height:90px;max-height:40vh;overflow:auto}.status{padding:12px;border-radius:12px;background:var(--bad);font-weight:800}.status.ok{background:var(--good)}.status.warn{background:var(--warn)}.small,.hint{color:var(--muted);font-size:.93em}.pill{display:inline-block;padding:4px 8px;border:1px solid var(--border);border-radius:999px;color:var(--muted)}.mono{font-family:ui-monospace,SFMono-Regular,Consolas,monospace}.fileBtn{padding:6px 8px;min-width:36px}details>summary{cursor:pointer}progress{width:100%;height:16px}.fileLine{border-bottom:1px solid #ffffff12;padding:6px 0}.fileLine:last-child{border-bottom:0}#localQr{display:none;background:#fff;color:#000;padding:10px;border-radius:10px;max-width:100%;overflow:auto;width:max-content}
+</style>
+</head>
+<body>
+<div class="box">
+<h2>P2P WebRTC v8 Condensed Merge Slice</h2>
+<div id="status" class="status">idle</div>
+<input id="populateFileInput" type="file" accept=".txt,.js,.json,.html,.sdp,.log,.md,text/*,application/json,application/javascript" style="display:none" onchange="finishPopulateFromFile(this)">
+<div class="card hint"><b>Scope:</b> this is a condensed v8 merge slice: V8 kernel first, with V7/prompt intentions re-added as compact modules. It has localdata vault, identity, manual WebRTC first contact, negotiated control/binary channels, binary file pump with backpressure, route-vault recording, bounded eval, SignalMux hooks, SyncPlanner, and MediaManager. It is still not the full production Auto-Rendezvous/Sync release.</div>
+
+<details class="card" open><summary><b>1. Local identity / localdata vault</b></summary>
+  <div class="row">
+    <label>Device name <input id="deviceName" type="text" placeholder="Work laptop / Phone" oninput="saveVaultSoon()"></label>
+    <span class="pill">device id: <span id="deviceId" class="mono"></span></span> <span class="pill">vault: <span id="vaultSize" class="mono"></span></span>
+    <button onclick="exportVault()">Export vault</button>
+    <button onclick="importVaultPrompt()">Import vault</button>
+    <button class="danger" onclick="clearVaultConfirm()">Clear vault</button>
+  </div>
+  <div id="knownPeers" class="small"></div>
+</details>
+
+<details class="card" open><summary><b>2. Auto Start Connect / manual signaling fallback</b></summary>
+  <div class="hint">Both devices create the same negotiated channels. Device A makes offer; Device B applies offer and makes answer; Device A applies answer. Future v8 Auto Start/Auto Reconnect should put these same SDP boxes through hidden encrypted relays.</div>
+  <div class="row">
+    <label><input id="autoCollapseSetup" type="checkbox" checked> auto-collapse setup on ctrl open</label>
+    <button class="primary" onclick="makeOfferCode()">Auto Start Connect: make offer</button>
+    <button class="good" onclick="acceptOfferMakeAnswer()">Accept offer → make answer</button>
+    <button class="good" onclick="applyAnswerCode()">Apply answer</button>
+    <button onclick="copyLocalCode()">Copy local code</button>
+    <button onclick="pasteRemoteCode()">Paste remote code</button>
+    <button onclick="makeLocalQr()">Make QR</button>
+    <button onclick="hideLocalQr()">Hide QR</button>
+    <button onclick="startQrScan()">Read QR</button>
+    <button onclick="stopQrScan()">Stop QR</button>
+    <button class="danger" onclick="resetPeer()">Reset peer</button>
+  </div>
+  <div class="grid two">
+    <div><label class="small">Local code</label><textarea id="localCode" readonly></textarea><div id="localQr"></div>
+  <video id="qrVideo" playsinline muted style="display:none;width:100%;max-height:280px;background:#000;border-radius:10px"></video></div>
+    <div><label class="small">Remote code</label><textarea id="remoteCode" placeholder="Paste offer/answer here"></textarea></div>
+  </div>
+</details>
+
+<details class="card" open><summary><b>3. Auto Reconnect / route vault</b></summary>
+  <div class="hint">This is the v8 reconnect direction implemented as hooks: identity vault, route-vault candidate capture, restartIce trigger, and 1/sec scheduler. Hidden relay rooms are logged/derived but not yet transported by built-in Nostr/MQTT.</div>
+  <div class="row">
+    <label>Peer alias <input id="peerAlias" type="text" placeholder="Friend X / Work laptop"></label>
+    <button onclick="saveCurrentPeerAlias()">Save alias for connected peer</button>
+    <button onclick="deriveReconnectRoomForCurrentPeer()">Derive hidden reconnect room</button>
+    <button onclick="useCurrentPeerHiddenRoomInMux()">Use hidden room in SignalMux</button>
+    <button onclick="startAutoReconnectMuxLoop()">Auto Reconnect via SignalMux</button>
+    <button onclick="startReconnectScheduler()">Start 1/sec rescue scheduler</button>
+    <button onclick="stopReconnectScheduler()">Stop rescue</button>
+    <button onclick="tryRestartIceNow()">pc.restartIce()</button>
+  </div>
+  <pre id="routeReport"></pre>
+</details>
+
+<details class="card" open><summary><b>4. Control channel: ping / text / eval</b></summary>
+  <div class="row">
+    <button class="primary" onclick="sendPing()">Ping</button>
+    <input id="textInput" type="text" placeholder="hello" style="flex:1;min-width:160px">
+    <button onclick="sendText()">Send text</button>
+    <label><input id="acceptRemoteEval" type="checkbox"> accept remote eval</label>
+  </div>
+  <textarea id="evalCode" class="code" placeholder="console.log('hi'); 'result';"></textarea>
+  <div class="row"><button onclick="runEvalLocal()">Eval local</button><button class="good" onclick="sendEvalRemote()">Send eval remote</button><button onclick="clearEval()">Clear eval output</button></div>
+  <pre id="evalOut"></pre>
+</details>
+
+<details class="card" open><summary><b>5. Binary file transfer</b></summary>
+  <div class="hint">Uses bin DataChannel with ArrayBuffer frames, not base64 JSON. Control channel carries file metadata. Backpressure uses bufferedAmountLowThreshold / bufferedamountlow. Receiver streams to picked folder when supported; otherwise uses memory Blob fallback.</div>
+  <div class="row">
+    <input id="fileInput" type="file" multiple>
+    <button class="primary" onclick="sendSelectedFiles()">Send selected files</button>
+    <button onclick="pickReceiveFolder()">Pick receive folder</button>
+    <button onclick="clearDownloads()">Clear memory downloads</button>
+  </div>
+  <div id="fileList" class="small"></div>
+</details>
+
+
+<details class="card" open><summary><b>6. SignalMux / encrypted relay-ready packets</b></summary>
+  <div class="hint">V8-native extraction of V7 link/socket/Nostr/MQTT idea: one method list feeds a SignalMux. This slice packs/unpacks encrypted relay payloads and keeps method order; custom WSS/manual packet transport are wired with optional auto-apply; Nostr/MQTT/link relay are next modules.</div>
+  <div class="row">
+    <label>Room id <input id="muxRoom" type="text" value="cross_talk_room1" oninput="saveMuxSettingsSoon()"></label>
+    <label>Randomize using <input id="muxSalt" type="text" placeholder="orange / shared phrase" oninput="saveMuxSettingsSoon()"></label>
+    <label><input id="muxHashRoom" type="checkbox" onchange="saveMuxSettingsSoon();renderMuxRoom()"> randomizer on</label>
+    <span class="pill">derived: <span id="muxRoomPreview" class="mono"></span></span>
+  </div>
+  <div id="muxMethods" class="small"></div>
+  <div class="row">
+    <input id="customWssUrl" type="text" placeholder="wss://custom relay / optional" style="flex:1;min-width:230px">
+    <button onclick="customWssConnect()">Connect WSS</button>
+    <button onclick="customWssPublishPacket()">Publish packet</button>
+    <button onclick="customWssDisconnect()">Disconnect WSS</button>
+  </div>
+  <div class="row">
+    <button onclick="packLocalSignalPacket()">Pack local code as encrypted signal</button>
+    <button onclick="unpackSignalPacketToRemote()">Unpack signal → remote code</button>
+    <button onclick="copyRelayPacket()">Copy packet</button>
+    <button onclick="makeRelayPacketQr()">QR packet</button>
+    <label><input id="autoApplySignals" type="checkbox" checked> auto-apply received SDP</label>
+    <button onclick="startAutoStartMuxLoop()">Auto Start loop</button>
+    <button onclick="stopAutoStartMuxLoop()">Stop loop</button>
+  </div>
+  <textarea id="relayPacket" class="code" placeholder="Encrypted relay-ready packet appears here. It can be transported by future Nostr/MQTT/custom-WSS/manual copy."></textarea>
+  <pre id="muxReport" class="compact"></pre>
+</details>
+
+<details class="card" open><summary><b>7. SyncPlanner / folder manifest</b></summary>
+  <div class="hint">V8-native extraction of V7 folder sync: build compact manifests, compare with 2s timestamp tolerance, block destructive sync until full manifest + explicit delete permission exists.</div>
+  <input id="syncFolderInput" type="file" webkitdirectory directory multiple style="display:none" onchange="finishSyncFolderPick(this)">
+  <div class="row">
+    <button onclick="beginSyncFolderPick()">Pick folder and build manifest</button>
+    <button onclick="sendLocalManifest()">Send manifest over ctrl</button>
+    <button onclick="exportLocalManifest()">Export manifest</button>
+    <button onclick="importRemoteManifestPrompt()">Import remote manifest</button>
+    <button onclick="planSyncNow()">Plan sync</button>
+    <label><input id="syncAllowDeletes" type="checkbox"> allow deletions</label>
+  </div>
+  <label class="small">Path hint / no-list request <input id="syncPathHint" type="text" style="width:100%" placeholder="metadata only unless picker grants access"></label>
+  <div class="grid two"><pre id="syncLocal" class="compact"></pre><pre id="syncPlan" class="compact"></pre></div>
+</details>
+
+<details class="card" open><summary><b>8. MediaManager / voice video screen hooks</b></summary>
+  <div class="hint">Media is V8-native: addTrack/removeTrack uses the perfect-negotiation path instead of ad-hoc SDP code. Bulk files stay on bin channel; media rides WebRTC RTP and shares network capacity.</div>
+  <div class="row">
+    <button onclick="startVoice()">Start voice</button>
+    <button onclick="startVideo()">Start video</button>
+    <button onclick="startScreen()">Share screen</button>
+    <button class="danger" onclick="stopMedia()">Stop media</button>
+  </div>
+  <div class="grid two"><div><div class="small">Local preview</div><video id="localVideo" autoplay playsinline muted style="width:100%;max-height:240px;background:#000;border-radius:10px"></video></div><div><div class="small">Remote media</div><video id="remoteVideo" autoplay playsinline style="width:100%;max-height:240px;background:#000;border-radius:10px"></video></div></div>
+</details>
+
+<details class="card" open><summary><b>9. Global log</b></summary><pre id="log"></pre></details>
+</div>
+<script>
+'use strict';
+const $=id=>document.getElementById(id);
+const VAULT_KEY='p2p_v8_vault';
+const CODE_PREFIX='P2P-V8-SDP:';
+const CTRL_ID=0,BIN_ID=1,HIGH_WATER=16*1024*1024,LOW_WATER=4*1024*1024;
+const FRAME_MAGIC=0x56384231; // V8B1
+const encoder=new TextEncoder(),decoder=new TextDecoder();
+let vault,pc=null,ctrlChan=null,binChan=null,reconnectTimer=null,currentPeerId=null,receiveDirHandle=null;
+let makingOffer=false,ignoreOffer=false,isSettingRemoteAnswerPending=false;
+const pendingPings=new Map(),incomingFiles=new Map(),memoryDownloads=[];
+
+function log(msg){$('log').textContent+='['+new Date().toLocaleTimeString()+'] '+msg+'\n';$('log').scrollTop=$('log').scrollHeight}
+function rlog(msg){$('routeReport').textContent+='['+new Date().toLocaleTimeString()+'] '+msg+'\n';$('routeReport').scrollTop=$('routeReport').scrollHeight;log('ROUTE: '+msg)}
+function setStatus(text,mode=''){const el=$('status');el.textContent=text;el.className='status '+(mode==='ok'?'ok':mode==='warn'?'warn':'')}
+function randomHex(bytes=16){const a=crypto.getRandomValues(new Uint8Array(bytes));return [...a].map(x=>x.toString(16).padStart(2,'0')).join('')}
+function b64u(bytes){let s='';for(const b of bytes)s+=String.fromCharCode(b);return btoa(s).replaceAll('+','-').replaceAll('/','_').replaceAll('=','')}
+function ub64(text){text=text.replaceAll('-','+').replaceAll('_','/');text+='='.repeat((4-text.length%4)%4);return Uint8Array.from(atob(text),c=>c.charCodeAt(0))}
+async function sha256Hex(text){const h=await crypto.subtle.digest('SHA-256',encoder.encode(text));return [...new Uint8Array(h)].map(x=>x.toString(16).padStart(2,'0')).join('')}
+function encodeCode(obj){return CODE_PREFIX+b64u(encoder.encode(JSON.stringify(obj)))}
+function decodeCode(text){text=text.trim();if(text.startsWith(CODE_PREFIX))text=text.slice(CODE_PREFIX.length);return JSON.parse(decoder.decode(ub64(text)))}
+
+function defaultVault(){return{version:1,localDevice:{id:randomHex(16),name:'Device '+Math.random().toString(36).slice(2,6),pairSecret:randomHex(32),createdAt:Date.now()},peers:{},settings:{defaultRoom:'cross_talk_room1',methodOrder:['manual','hidden-reconnect-room'],randomizerOn:false}}}
+function loadVault(){try{vault=JSON.parse(localStorage.getItem(VAULT_KEY)||'null')||defaultVault()}catch{vault=defaultVault()}vault.localDevice.pairSecret ||= randomHex(32);vault.settings ||= {};vault.peers ||= {};$('deviceId').textContent=vault.localDevice.id;$('deviceName').value=vault.localDevice.name||'';renderKnownPeers();renderVaultSize(JSON.stringify(vault).length);return vault}
+function pruneVaultForLocaldata(hard=false){
+  for(const p of Object.values(vault.peers||{})){
+    if(p.routeVault){
+      p.routeVault.candidates=(p.routeVault.candidates||[]).slice(0,hard?20:80);
+      p.routeVault.selectedPairs=(p.routeVault.selectedPairs||[]).slice(0,hard?10:40);
+      p.routeVault.lastGoodMethods=(p.routeVault.lastGoodMethods||[]).slice(0,hard?10:30);
+    }
+    if(p.reconnect)p.reconnect.rooms=(p.reconnect.rooms||[]).slice(0,hard?6:16);
+    if(hard&&p.transfers)p.transfers={};
+  }
+}
+function saveVault(){
+  vault.localDevice.name=$('deviceName').value.trim()||vault.localDevice.name;
+  pruneVaultForLocaldata(false);
+  let text=JSON.stringify(vault);
+  try{localStorage.setItem(VAULT_KEY,text)}
+  catch(e){
+    pruneVaultForLocaldata(true);
+    text=JSON.stringify(vault);
+    try{localStorage.setItem(VAULT_KEY,text);log('Vault was pruned to stay inside localdata/quota limits.')}
+    catch(e2){log('Vault save failed even after pruning: '+e2.message)}
+  }
+  renderKnownPeers();renderVaultSize(text.length)
+}
+let saveTimer=null;function saveVaultSoon(){clearTimeout(saveTimer);saveTimer=setTimeout(saveVault,250)}
+function renderVaultSize(chars){const el=$('vaultSize');if(!el)return;el.textContent=(chars/1024).toFixed(1)+' KiB';if(chars>1800*1024)el.textContent+=' ⚠ near 2MB localdata target'}
+function peerRecord(id){if(!vault.peers[id])vault.peers[id]={peerDeviceId:id,peerName:'',alias:'',pairToken:'',createdAt:Date.now(),lastSeen:0,routeVault:{candidates:[],selectedPairs:[],lastGoodMethods:[]},reconnect:{rooms:[]},transfers:{}};return vault.peers[id]}
+function mergeUnpairedRouteVault(peerId){
+  if(!peerId||peerId==='unpaired'||!vault.peers?.unpaired)return;
+  const src=vault.peers.unpaired, dst=peerRecord(peerId);
+  dst.routeVault ||= {candidates:[],selectedPairs:[],lastGoodMethods:[]};
+  dst.routeVault.candidates=[...(src.routeVault?.candidates||[]),...(dst.routeVault.candidates||[])].slice(0,80);
+  dst.routeVault.selectedPairs=[...(src.routeVault?.selectedPairs||[]),...(dst.routeVault.selectedPairs||[])].slice(0,40);
+  delete vault.peers.unpaired;
+  log('Merged pre-identity route observations into peer '+peerId);
+}
+function renderKnownPeers(){const peers=Object.values(vault.peers||{});$('knownPeers').innerHTML=peers.length?peers.map(p=>`<div class="fileLine"><b>${escapeHtml(p.alias||p.peerName||p.peerDeviceId)}</b> <span class="mono">${escapeHtml(p.peerDeviceId)}</span> <button onclick="selectPeerForReconnect('${String(p.peerDeviceId).replace(/['\\]/g,'')}')">Use for Auto Reconnect</button><br>last seen: ${p.lastSeen?new Date(p.lastSeen).toLocaleString():'never'} | candidates: ${(p.routeVault?.candidates||[]).length} | rooms: ${(p.reconnect?.rooms||[]).length}</div>`).join(''):'No known peers yet.'}
+function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function exportVault(){navigator.clipboard?.writeText(JSON.stringify(vault,null,2));log('Vault copied/exported to clipboard if permission allowed.')}
+function importVaultPrompt(){const text=prompt('Paste v8 vault JSON');if(!text)return;const obj=JSON.parse(text);if(!obj.version||!obj.localDevice)throw new Error('bad vault');vault=obj;saveVault();loadVault();log('Vault imported.')}
+function clearVaultConfirm(){if(confirm('Clear local v8 vault?')){localStorage.removeItem(VAULT_KEY);loadVault();log('Vault cleared/recreated.')}}
+
+function rtcConfig(){return{iceServers:[{urls:'stun:stun.l.google.com:19302'}]}}
+function makePeer(){resetPeer(false);pc=new RTCPeerConnection(rtcConfig());pc.onicecandidate=e=>{if(e.candidate){storeCandidate('local',e.candidate);log('ICE candidate: '+e.candidate.type)}};pc.oniceconnectionstatechange=()=>{log('ICE '+pc.iceConnectionState);if(['disconnected','failed'].includes(pc.iceConnectionState))startReconnectScheduler();};pc.onconnectionstatechange=()=>{log('PC '+pc.connectionState);if(pc.connectionState==='connected')setStatus('connected','ok');if(['disconnected','failed'].includes(pc.connectionState))setStatus('degraded: '+pc.connectionState,'warn')};pc.onnegotiationneeded=perfectNegotiationNeeded;ctrlChan=pc.createDataChannel('ctrl',{negotiated:true,id:CTRL_ID,ordered:true});binChan=pc.createDataChannel('bin',{negotiated:true,id:BIN_ID,ordered:true});setupCtrl(ctrlChan);setupBin(binChan);attachMediaHooks();return pc}
+function resetPeer(clearLog=true){if(reconnectTimer)stopReconnectScheduler();if(ctrlChan){try{ctrlChan.close()}catch{}}if(binChan){try{binChan.close()}catch{}}if(pc){try{pc.close()}catch{}}pc=ctrlChan=binChan=null;currentPeerId=null;setStatus('idle');if(clearLog)log('Peer reset.')}
+async function waitIceComplete(){if(pc.iceGatheringState==='complete')return;await new Promise(resolve=>{let done=false;const finish=()=>{if(!done){done=true;resolve()}};pc.addEventListener('icegatheringstatechange',()=>{if(pc.iceGatheringState==='complete')finish()});pc.addEventListener('icecandidate',e=>{if(!e.candidate)finish()});setTimeout(finish,5000)})}
+async function makeOfferCode(){makePeer();setStatus('making offer','warn');await pc.setLocalDescription(await pc.createOffer());await waitIceComplete();$('localCode').value=encodeCode(pc.localDescription);setStatus('offer ready','warn');log('Offer ready: '+$('localCode').value.length+' chars')}
+async function acceptOfferMakeAnswer(){makePeer();const offer=decodeCode($('remoteCode').value);storeRemoteDescriptionCandidates(offer);await pc.setRemoteDescription(offer);await pc.setLocalDescription(await pc.createAnswer());await waitIceComplete();$('localCode').value=encodeCode(pc.localDescription);setStatus('answer ready','warn');log('Answer ready: '+$('localCode').value.length+' chars')}
+async function applyAnswerCode(){if(!pc)throw new Error('make offer first');const answer=decodeCode($('remoteCode').value);storeRemoteDescriptionCandidates(answer);await pc.setRemoteDescription(answer);log('Answer applied. Waiting for channels.')}
+function copyLocalCode(){navigator.clipboard?.writeText($('localCode').value);log('Copied local code if clipboard permission allowed.')}
+async function pasteRemoteCode(){try{$('remoteCode').value=await navigator.clipboard.readText();log('Pasted remote code.')}catch(e){log('Paste failed: '+e.message)}}
+
+function maybeAutoCollapseSetup(){if(!$('autoCollapseSetup')?.checked)return;document.querySelectorAll('details.card').forEach((d,i)=>{if(i<3)d.open=false});log('setup sections auto-collapsed after control channel opened')}
+function setupCtrl(ch){ch.onopen=()=>{setStatus('control open','ok');log('ctrl open');maybeAutoCollapseSetup();sendCtrl({type:'identity',deviceId:vault.localDevice.id,name:$('deviceName').value||vault.localDevice.name,tokenPart:vault.localDevice.pairSecret,time:Date.now()});};ch.onclose=()=>log('ctrl closed');ch.onerror=e=>log('ctrl error');ch.onmessage=e=>handleCtrl(e.data)}
+function setupBin(ch){ch.binaryType='arraybuffer';ch.bufferedAmountLowThreshold=LOW_WATER;ch.onopen=()=>log('bin open');ch.onclose=()=>log('bin closed');ch.onerror=e=>log('bin error');ch.onmessage=e=>handleBin(e.data)}
+function ctrlReady(){return ctrlChan&&ctrlChan.readyState==='open'}function binReady(){return binChan&&binChan.readyState==='open'}
+function sendCtrl(obj){if(!ctrlReady()){log('ctrl not open; cannot send '+obj.type);return false}ctrlChan.send(JSON.stringify(obj));return true}
+function canSignal(){return ctrlReady()}
+function politeFor(peerId){return String(vault.localDevice.id)<String(peerId||'zzzz')}
+async function handleSignaledDescription(description){
+  const polite=politeFor(currentPeerId);
+  const readyForOffer=!makingOffer&&(pc.signalingState==='stable'||isSettingRemoteAnswerPending);
+  const offerCollision=description.type==='offer'&&!readyForOffer;
+  ignoreOffer=!polite&&offerCollision;
+  if(ignoreOffer){log('perfect-negotiation: ignored colliding offer as impolite peer');return}
+  isSettingRemoteAnswerPending=description.type==='answer';
+  try{
+    if(offerCollision&&polite&&pc.signalingState!=='stable'){
+      log('perfect-negotiation: polite rollback before accepting colliding offer');
+      try{await pc.setLocalDescription({type:'rollback'})}
+      catch(e){log('rollback failed/unsupported, trying direct setRemoteDescription: '+e.message)}
+    }
+    storeRemoteDescriptionCandidates(description);
+    await pc.setRemoteDescription(description);
+    if(description.type==='offer'){
+      await pc.setLocalDescription();
+      sendCtrl({type:'description',description:pc.localDescription,time:Date.now()});
+    }
+  }finally{isSettingRemoteAnswerPending=false}
+}
+async function perfectNegotiationNeeded(){
+  if(!pc||!canSignal())return;
+  try{
+    makingOffer=true;
+    await pc.setLocalDescription();
+    sendCtrl({type:'description',description:pc.localDescription,time:Date.now()});
+    log('perfect-negotiation: sent '+pc.localDescription.type);
+  }catch(e){log('perfect-negotiation negotiationneeded failed: '+e.message)}
+  finally{makingOffer=false}
+}
+async function handleCtrl(data){let msg;try{msg=JSON.parse(data)}catch{log('ctrl raw: '+data);return}if(msg.type==='identity'){currentPeerId=msg.deviceId;const p=peerRecord(currentPeerId);mergeUnpairedRouteVault(currentPeerId);p.peerName=msg.name||p.peerName;p.lastSeen=Date.now();if(msg.tokenPart){const ids=[vault.localDevice.id,currentPeerId].sort().join('|');const secrets=[vault.localDevice.pairSecret,msg.tokenPart].sort().join('|');p.pairToken=await sha256Hex('pair-v8|'+ids+'|'+secrets)}saveVault();log('identity from '+(msg.name||msg.deviceId));return}if(msg.type==='ping'){sendCtrl({type:'pong',id:msg.id,time:Date.now()});log('ping received '+msg.id);return}if(msg.type==='pong'){const t=pendingPings.get(msg.id);pendingPings.delete(msg.id);log('pong '+msg.id+(t?' RTT '+Math.round(performance.now()-t)+'ms':''));return}if(msg.type==='text'){log('TEXT: '+msg.text);return}if(msg.type==='evalReq'){if(!$('acceptRemoteEval').checked){sendCtrl({type:'evalRes',id:msg.id,ok:false,error:'remote eval disabled'});return}const res=await runEvalEngine(msg.code,'remote');sendCtrl({type:'evalRes',id:msg.id,...fitEvalReport(res)});return}if(msg.type==='evalRes'){evalPrint('remote result '+msg.id+': '+JSON.stringify(msg,null,2));return}if(msg.type==='fileStart'){await prepareIncomingFile(msg);return}if(msg.type==='fileEnd'){await finishIncomingFile(msg);return}if(msg.type==='resumeReq'){log('resumeReq received (first slice logs only): '+JSON.stringify(msg));return}if(msg.type==='description'){await handleSignaledDescription(msg.description);return}if(msg.type==='iceRestartOffer'||msg.type==='iceRestartAnswer'){if(msg.description){await handleSignaledDescription(msg.description);log('handled '+msg.type+' through perfect-negotiation path')}else log('reconnect signal missing description: '+msg.type);return}if(msg.type==='syncManifest'){syncRemoteManifest=msg.manifest;$('syncPlan').textContent='Remote manifest received over ctrl: '+((syncRemoteManifest.files||[]).length)+' files listed';log('sync manifest received');return}log('ctrl unknown '+JSON.stringify(msg).slice(0,400))}
+function sendPing(){const id=randomHex(5);pendingPings.set(id,performance.now());sendCtrl({type:'ping',id,time:Date.now()})}
+function sendText(){sendCtrl({type:'text',text:$('textInput').value||'hello',time:Date.now()})}
+
+async function runEvalEngine(code,origin){const logs=[];const old={log:console.log,info:console.info,warn:console.warn,error:console.error,debug:console.debug};const cap=(k)=>(...args)=>{logs.push(k+': '+args.map(a=>{try{return typeof a==='string'?a:JSON.stringify(a)}catch{return String(a)}}).join(' '));old[k](...args)};Object.assign(console,{log:cap('log'),info:cap('info'),warn:cap('warn'),error:cap('error'),debug:cap('debug')});window.copy=async text=>{await navigator.clipboard.writeText(String(text));return 'copied '+String(text).length+' chars'};try{const value=await (0,eval)(`(async()=>{${code}\n})()`);return{origin,ok:true,value,logs,time:Date.now()}}catch(e){return{origin,ok:false,error:e.stack||e.message,logs,time:Date.now()}}finally{Object.assign(console,old)}}
+function fitEvalReport(r){const s=JSON.stringify(r);if(s.length<60000)return r;return{origin:r.origin,ok:r.ok,truncated:true,preview:s.slice(0,58000),originalChars:s.length}}
+async function runEvalLocal(){const r=await runEvalEngine($('evalCode').value,'local');evalPrint(JSON.stringify(fitEvalReport(r),null,2))}
+function sendEvalRemote(){sendCtrl({type:'evalReq',id:randomHex(6),code:$('evalCode').value,time:Date.now()})}
+function evalPrint(s){$('evalOut').textContent+='['+new Date().toLocaleTimeString()+'] '+s+'\n';$('evalOut').scrollTop=$('evalOut').scrollHeight}
+function clearEval(){$('evalOut').textContent=''}
+
+function fileId(){return randomHex(12)}
+function makeFrame(id,index,payload){const idBytes=encoder.encode(id);const out=new Uint8Array(10+idBytes.length+payload.byteLength);const dv=new DataView(out.buffer);dv.setUint32(0,FRAME_MAGIC);dv.setUint16(4,idBytes.length);dv.setUint32(6,index);out.set(idBytes,10);out.set(new Uint8Array(payload),10+idBytes.length);return out.buffer}
+function parseFrame(buffer){const dv=new DataView(buffer);if(dv.getUint32(0)!==FRAME_MAGIC)throw new Error('bad binary frame magic');const idLen=dv.getUint16(4),index=dv.getUint32(6);const id=decoder.decode(new Uint8Array(buffer,10,idLen));const payload=new Uint8Array(buffer,10+idLen);return{id,index,payload}}
+async function waitBinLow(){if(!binChan||binChan.bufferedAmount<=LOW_WATER)return;await new Promise(resolve=>binChan.addEventListener('bufferedamountlow',resolve,{once:true}))}
+async function sendSelectedFiles(){if(!ctrlReady()||!binReady()){log('channels not open');return}const files=[...$('fileInput').files];for(const file of files)await sendOneFile(file)}
+async function sendOneFile(file){const id=fileId();const chunkSize=64*1024;sendCtrl({type:'fileStart',id,name:file.name,size:file.size,chunkSize,lastModified:file.lastModified,time:Date.now()});addFileLine(id,'sending '+file.name,file.size);let sent=0,index=0;const reader=file.stream().getReader();while(true){const {done,value}=await reader.read();if(done)break;let off=0;while(off<value.byteLength){const part=value.subarray(off,off+chunkSize);while(binChan.bufferedAmount>HIGH_WATER)await waitBinLow();binChan.send(makeFrame(id,index++,part));sent+=part.byteLength;off+=part.byteLength;updateFileLine(id,sent,file.size)}}sendCtrl({type:'fileEnd',id,chunks:index,size:file.size,time:Date.now()});log('file sent '+file.name+' '+file.size+' bytes')}
+async function pickReceiveFolder(){if(!window.showDirectoryPicker){log('showDirectoryPicker unsupported; memory download fallback will be used.');return}receiveDirHandle=await showDirectoryPicker({mode:'readwrite'});log('Receive folder picked.')}
+function safeFileName(name){return String(name||'file').normalize('NFC').replace(/[\/:*?"<>|\x00-\x1f\x7f]+/g,'_').replace(/^\.+$/,'_').slice(0,180)||'file'}
+async function prepareIncomingFile(msg){msg={...msg,name:safeFileName(msg.name)};let writable=null,handle=null;if(receiveDirHandle){try{handle=await receiveDirHandle.getFileHandle(msg.name+'.part',{create:true});writable=await handle.createWritable()}catch(e){log('folder write failed, using memory: '+e.message)}}incomingFiles.set(msg.id,{...msg,received:0,chunks:0,parts:[],writable,handle});addFileLine(msg.id,'receiving '+msg.name,msg.size);log('fileStart '+msg.name+' '+msg.size)}
+async function handleBin(data){if(!(data instanceof ArrayBuffer)){log('non-arraybuffer on bin ignored');return}const f=parseFrame(data);const rec=incomingFiles.get(f.id);if(!rec){log('binary chunk for unknown file '+f.id);return}if(f.index!==rec.chunks)log('chunk order warning file '+f.id+' expected '+rec.chunks+' got '+f.index);rec.chunks++;rec.received+=f.payload.byteLength;if(rec.writable)await rec.writable.write(f.payload);else rec.parts.push(f.payload);updateFileLine(f.id,rec.received,rec.size)}
+async function finishIncomingFile(msg){const rec=incomingFiles.get(msg.id);if(!rec){log('fileEnd unknown '+msg.id);return}let ok=rec.received===msg.size&&rec.chunks===msg.chunks;if(rec.writable){await rec.writable.close();log((ok?'received ':'INCOMPLETE ')+rec.name+' written as .part convention; browser rename/finalize not implemented in slice.')}else{const blob=new Blob(rec.parts);const url=URL.createObjectURL(blob);memoryDownloads.push(url);const a=document.createElement('a');a.href=url;a.download=rec.name;a.textContent='download '+rec.name+(ok?'':' (INCOMPLETE)');a.className='pill';$('file-'+msg.id)?.append(' ',a);log((ok?'received ':'INCOMPLETE ')+rec.name+' memory blob ready')}incomingFiles.delete(msg.id)}
+function addFileLine(id,label,total){const div=document.createElement('div');div.className='fileLine';div.id='file-'+id;div.innerHTML=`<b>${escapeHtml(label)}</b><br><progress id="prog-${id}" max="${total||1}" value="0"></progress> <span id="progtext-${id}">0 / ${total||0}</span>`;$('fileList').prepend(div)}
+function updateFileLine(id,done,total){const p=$('prog-'+id),t=$('progtext-'+id);requestAnimationFrame(()=>{if(p){p.max=total||1;p.value=done}if(t)t.textContent=done+' / '+total})}
+function clearDownloads(){for(const u of memoryDownloads)URL.revokeObjectURL(u);memoryDownloads.length=0;log('Memory download object URLs revoked.')}
+
+function storeCandidate(side,cand){const key=currentPeerId||'unpaired';const p=peerRecord(key);const arr=p.routeVault.candidates;arr.unshift({side,candidate:cand.candidate,sdpMid:cand.sdpMid,sdpMLineIndex:cand.sdpMLineIndex,usernameFragment:cand.usernameFragment||'',type:cand.type||'',protocol:cand.protocol||'',seenAt:Date.now()});p.routeVault.candidates=arr.slice(0,80);saveVault()}
+function storeRemoteDescriptionCandidates(desc){
+  if(!desc||!desc.sdp)return;
+  const key=currentPeerId||'unpaired';
+  const p=peerRecord(key);
+  const arr=p.routeVault.candidates||[];
+  for(const line of String(desc.sdp).split(/\r?\n/)){
+    if(line.startsWith('a=candidate:'))arr.unshift({side:'remote-sdp',candidate:line.slice(2),sdpMid:'0',sdpMLineIndex:0,type:'sdp',protocol:'',seenAt:Date.now()});
+  }
+  p.routeVault.candidates=arr.slice(0,80);
+  saveVault();
+}
+async function sampleStats(){if(!pc)return;const stats=await pc.getStats();const pairs=[];stats.forEach(s=>{if(s.type==='candidate-pair'&&(s.selected||s.nominated||s.state==='succeeded'))pairs.push({id:s.id,state:s.state,nominated:!!s.nominated,bytesSent:s.bytesSent||0,bytesReceived:s.bytesReceived||0,ts:Date.now()})});if(currentPeerId&&pairs.length){const p=peerRecord(currentPeerId);p.routeVault.selectedPairs=[...pairs,...(p.routeVault.selectedPairs||[])].slice(0,40);saveVault();rlog('stored selected/succeeded pair stats '+pairs.length)}}
+function startReconnectScheduler(){if(reconnectTimer)return;rlog('reconnect scheduler started: one action/sec');let tick=0;reconnectTimer=setInterval(async()=>{tick++;if(ctrlReady()){sendCtrl({type:'ping',id:'rescue_'+tick,time:Date.now()});await sampleStats();rlog('tier0 heartbeat/stats tick '+tick);return}if(pc&&['disconnected','failed'].includes(pc.iceConnectionState)){rlog('tier1 degraded; opportunistic candidate rescue tick '+tick);try{await tryVaultedCandidates()}catch(e){rlog('candidate rescue error '+e.message)}}else rlog('scheduler tick '+tick+' no live ctrl')},1000)}
+function stopReconnectScheduler(){if(reconnectTimer){clearInterval(reconnectTimer);reconnectTimer=null;rlog('reconnect scheduler stopped')}} 
+async function tryVaultedCandidates(){if(!pc||!currentPeerId)return;const p=peerRecord(currentPeerId);const candidates=(p.routeVault.candidates||[]).filter(x=>x.side!=='local').slice(0,3);if(!candidates.length){rlog('no vaulted remote candidates to retry');return}for(const c of candidates){try{await pc.addIceCandidate({candidate:c.candidate,sdpMid:c.sdpMid||'0',sdpMLineIndex:c.sdpMLineIndex??0,usernameFragment:c.usernameFragment||undefined});rlog('re-added vaulted remote candidate '+(c.type||c.side||''))}catch(e){rlog('vault candidate rejected: '+e.message)}}}
+async function tryRestartIceNow(){if(!pc){rlog('no pc');return}try{pc.restartIce();rlog('restartIce requested; create/send fresh offer through a signaling path next.');if(ctrlReady()){await pc.setLocalDescription(await pc.createOffer({iceRestart:true}));sendCtrl({type:'iceRestartOffer',description:pc.localDescription,time:Date.now()});rlog('sent restart offer over live ctrl')}}catch(e){rlog('restartIce failed '+e.message)}}
+async function selectPeerForReconnect(id){currentPeerId=id;const p=peerRecord(id);$('peerAlias').value=p.alias||'';await deriveReconnectRoomForCurrentPeer();rlog('selected known peer for Auto Reconnect: '+(p.alias||p.peerName||id));}
+async function saveCurrentPeerAlias(){if(!currentPeerId){log('No connected peer identity yet.');return}const p=peerRecord(currentPeerId);p.alias=$('peerAlias').value.trim();saveVault();log('Alias saved for '+currentPeerId)}
+function utcDayKey(offsetDays=0){const d=new Date(Date.now()+offsetDays*86400000);return d.toISOString().slice(0,10)}
+async function deriveReconnectRoomsForToken(pairToken){
+  const specs=[['stable','stable'],['day-1',utcDayKey(-1)],['day0',utcDayKey(0)],['day+1',utcDayKey(1)]];
+  const rooms=[];
+  for(const [scope,key] of specs)rooms.push({scope,key,room:(await sha256Hex('reconnect-room-v8|'+pairToken+'|'+scope+'|'+key)).slice(0,32),createdAt:Date.now()});
+  return rooms;
+}
+async function deriveReconnectRoomForCurrentPeer(){
+  if(!currentPeerId){rlog('no peer');return}
+  const p=peerRecord(currentPeerId);
+  if(!p.pairToken){rlog('cannot derive hidden reconnect rooms yet: pair token missing; connect once and exchange identity first');return}
+  const rooms=await deriveReconnectRoomsForToken(p.pairToken);
+  const seen=new Set();
+  p.reconnect.rooms=[...rooms,...(p.reconnect.rooms||[])].filter(x=>x&&x.room&&!seen.has(x.room)&&seen.add(x.room)).slice(0,16);
+  saveVault();
+  rlog('hidden reconnect rooms derived: '+rooms.map(x=>x.scope+':'+x.room).join(' | ')+' (transport backend must be custom WSS/manual until Nostr/MQTT are added)');
+}
+
+async function useCurrentPeerHiddenRoomInMux(scope='stable'){
+  if(!currentPeerId){rlog('select or connect a known peer first');return null}
+  const p=peerRecord(currentPeerId);
+  if(!p.pairToken){rlog('no pair token yet; first contact identity exchange required before hidden reconnect');return null}
+  if(!p.reconnect.rooms||!p.reconnect.rooms.length)await deriveReconnectRoomForCurrentPeer();
+  const room=(p.reconnect.rooms||[]).find(x=>x.scope===scope)||p.reconnect.rooms?.[0];
+  if(!room){rlog('no reconnect room available');return null}
+  $('muxRoom').value=room.room;
+  $('muxSalt').value='';
+  $('muxHashRoom').checked=false;
+  saveMuxSettingsSoon();
+  await renderMuxRoom();
+  rlog('SignalMux room set to hidden reconnect room '+room.scope+': '+room.room);
+  return room.room;
+}
+async function startAutoReconnectMuxLoop(){
+  const room=await useCurrentPeerHiddenRoomInMux('stable');
+  if(!room)return;
+  startAutoStartMuxLoop();
+  rlog('Auto Reconnect loop running on hidden token-derived room; needs custom WSS/relay transport or manual packet copy.');
+}
+
+
+
+/* -----------------------------
+   SignalMux: compact V8-native relay/method layer
+----------------------------- */
+let muxLoopTimer=null, muxKeyCache=new Map(), muxSeen=new Set();
+function defaultMuxMethods(){return[
+  {id:'manual',label:'Manual copy / QR packet',enabled:true},
+  {id:'custom-wss',label:'Custom WSS relay transport',enabled:false},
+  {id:'mqtt-wss',label:'MQTT-over-WSS future module',enabled:true},
+  {id:'nostr-wss',label:'Nostr WSS future module',enabled:true},
+  {id:'link-relay',label:'Simple link/note relay future module',enabled:false}
+]}
+function muxMethods(){vault.settings.muxMethods ||= defaultMuxMethods();return vault.settings.muxMethods}
+function muxLog(msg){$('muxReport').textContent+='['+new Date().toLocaleTimeString()+'] '+msg+'\n';$('muxReport').scrollTop=$('muxReport').scrollHeight;log('MUX: '+msg)}
+async function effectiveMuxRoom(){const seed=$('muxRoom')?.value||vault.settings.defaultRoom||'cross_talk_room1';const salt=$('muxSalt')?.value||'';const on=!!$('muxHashRoom')?.checked;return on?(await sha256Hex('mux-room-v8|'+seed+'|'+salt)).slice(0,32):seed}
+async function renderMuxRoom(){if($('muxRoomPreview'))$('muxRoomPreview').textContent=await effectiveMuxRoom()}
+function renderMuxMethods(){const box=$('muxMethods');if(!box)return;const arr=muxMethods();box.innerHTML=arr.map((m,i)=>`<div class="fileLine"><label><input type="checkbox" ${m.enabled?'checked':''} onchange="setMuxMethodEnabled('${m.id}',this.checked)"> <b>${escapeHtml(m.label)}</b></label> ${i?`<button onclick="moveMuxMethod(${i},-1)">↑</button>`:''} ${i<arr.length-1?`<button onclick="moveMuxMethod(${i},1)">↓</button>`:''}<br><span class="small mono">${escapeHtml(m.id)}</span></div>`).join('')}
+function setMuxMethodEnabled(id,on){const m=muxMethods().find(x=>x.id===id);if(m)m.enabled=!!on;saveVault();renderMuxMethods()}
+function moveMuxMethod(i,d){const arr=muxMethods();const j=i+d;if(j<0||j>=arr.length)return;[arr[i],arr[j]]=[arr[j],arr[i]];saveVault();renderMuxMethods()}
+let muxSaveTimer=null;function saveMuxSettingsSoon(){clearTimeout(muxSaveTimer);muxSaveTimer=setTimeout(async()=>{vault.settings.defaultRoom=$('muxRoom').value||'cross_talk_room1';vault.settings.muxSalt=$('muxSalt').value||'';vault.settings.muxHashRoom=!!$('muxHashRoom').checked;saveVault();await renderMuxRoom()},200)}
+async function loadMuxSettings(){if(!$('muxRoom'))return;$('muxRoom').value=vault.settings.defaultRoom||'cross_talk_room1';$('muxSalt').value=vault.settings.muxSalt||'';$('muxHashRoom').checked=!!vault.settings.muxHashRoom;renderMuxMethods();await renderMuxRoom()}
+async function muxKey(){const room=await effectiveMuxRoom();const pass='v8-signal|'+room+'|'+($('muxSalt')?.value||'');const k=await sha256Hex(pass);if(muxKeyCache.has(k))return muxKeyCache.get(k);const salt=encoder.encode('p2p-v8-mux|'+room).slice(0,32);const material=await crypto.subtle.importKey('raw',encoder.encode(pass),'PBKDF2',false,['deriveKey']);const key=await crypto.subtle.deriveKey({name:'PBKDF2',salt,iterations:150000,hash:'SHA-256'},material,{name:'AES-GCM',length:256},false,['encrypt','decrypt']);muxKeyCache.set(k,key);return key}
+async function packSignalObject(obj){const iv=crypto.getRandomValues(new Uint8Array(12));const plain=encoder.encode(JSON.stringify({msgId:randomHex(12),sender:vault.localDevice.id,sentAt:Date.now(),body:obj}));const cipher=new Uint8Array(await crypto.subtle.encrypt({name:'AES-GCM',iv},await muxKey(),plain));return {app:'p2p-v8-signalbox',v:1,room:await effectiveMuxRoom(),iv:b64u(iv),data:b64u(cipher)}}
+async function unpackSignalObject(box){if(!box||box.app!=='p2p-v8-signalbox')throw new Error('not a v8 signal box');const plain=await crypto.subtle.decrypt({name:'AES-GCM',iv:ub64(box.iv)},await muxKey(),ub64(box.data));const msg=JSON.parse(decoder.decode(plain));const seenKey=msg.sender+'|'+msg.msgId;if(muxSeen.has(seenKey))throw new Error('replay/duplicate signal '+seenKey);muxSeen.add(seenKey);return msg.body}
+async function packLocalSignalPacket(){if(!$('localCode').value.trim()){muxLog('no local code to pack');return}const packet=await packSignalObject({kind:'sdp-code',code:$('localCode').value.trim(),createdAt:Date.now()});$('relayPacket').value=JSON.stringify(packet);muxLog('packed encrypted signal packet '+$('relayPacket').value.length+' chars')}
+async function handleReceivedSignalBody(body,autoReply=false){
+  if(body.kind!=='sdp-code')throw new Error('unsupported signal kind '+body.kind);
+  $('remoteCode').value=body.code;
+  let desc=null;
+  try{desc=decodeCode(body.code)}catch(e){muxLog('received signal is not a recognized SDP code: '+e.message)}
+  muxLog('unpacked signal into remote code '+body.code.length+' chars'+(desc?' type '+desc.type:''));
+  if(!$('autoApplySignals')?.checked||!desc)return;
+  if(desc.type==='offer'){
+    muxLog('auto-applying offer and creating answer');
+    await acceptOfferMakeAnswer();
+    await packLocalSignalPacket();
+    if(autoReply&&customWss&&customWss.readyState===1)await customWssPublishPacket();
+  }else if(desc.type==='answer'){
+    muxLog('auto-applying answer');
+    await applyAnswerCode();
+  }else muxLog('auto-apply ignored SDP type '+desc.type);
+}
+async function unpackSignalPacketToRemote(autoReply=false){const packet=JSON.parse($('relayPacket').value.trim());const body=await unpackSignalObject(packet);await handleReceivedSignalBody(body,autoReply)}
+function copyRelayPacket(){navigator.clipboard?.writeText($('relayPacket').value);muxLog('copied relay packet if clipboard permission allowed')}
+async function makeRelayPacketQr(){if(!$('relayPacket').value.trim())await packLocalSignalPacket();await makeQrForText($('relayPacket').value,'Encrypted relay packet QR');muxLog('QR generated for encrypted relay packet via local QR panel')}
+function startAutoStartMuxLoop(){if(muxLoopTimer)return;muxLog('Auto Start loop: enabled methods rotate every second; custom WSS/manual packet are wired; received SDP can auto-apply; Nostr/MQTT remain future transports');let i=0;muxLoopTimer=setInterval(async()=>{const enabled=muxMethods().filter(m=>m.enabled);if(!enabled.length){muxLog('no enabled methods');return}const m=enabled[i++%enabled.length];if(m.id==='custom-wss'&&customWss&&customWss.readyState===1){try{await customWssPublishPacket()}catch(e){muxLog('custom-wss auto publish failed '+e.message)}return}if(m.id==='manual'&&$('localCode').value&&!$('relayPacket').value){try{await packLocalSignalPacket();muxLog('manual packet refreshed for copy/QR')}catch(e){muxLog('manual packet pack failed '+e.message)}return}muxLog('method '+m.id+' selected; transport module not wired in this slice')},1000)}
+function stopAutoStartMuxLoop(){if(muxLoopTimer){clearInterval(muxLoopTimer);muxLoopTimer=null;muxLog('Auto Start loop stopped')}}
+
+
+/* Custom WSS transport: compact SignalMux backend */
+let customWss=null;
+function customWssConnect(){const url=$('customWssUrl').value.trim();if(!url||!url.startsWith('wss://')){muxLog('Custom WSS URL must start with wss://');return}customWssDisconnect();customWss=new WebSocket(url);customWss.onopen=async()=>{const room=await effectiveMuxRoom();customWss.send(JSON.stringify({type:'join',room,app:'p2p-v8'}));muxLog('custom WSS connected/join sent '+room)};customWss.onclose=()=>muxLog('custom WSS closed');customWss.onerror=()=>muxLog('custom WSS error');customWss.onmessage=async e=>{try{const msg=JSON.parse(e.data);if(msg.from&&msg.from===vault.localDevice.id){muxLog('custom WSS ignored own echo');return}const packet=msg.packet||msg.payload||msg.signal||msg;if(packet&&packet.app==='p2p-v8-signalbox'){$('relayPacket').value=JSON.stringify(packet);muxLog('custom WSS packet received; attempting unpack');await unpackSignalPacketToRemote(true)}else muxLog('custom WSS ignored message '+String(e.data).slice(0,120))}catch(err){muxLog('custom WSS message error '+err.message)}}}
+async function customWssPublishPacket(){if(!customWss||customWss.readyState!==1){muxLog('custom WSS not open');return}if(!$('relayPacket').value.trim())await packLocalSignalPacket();const room=await effectiveMuxRoom();customWss.send(JSON.stringify({type:'signal',room,packet:JSON.parse($('relayPacket').value),from:vault.localDevice.id,ts:Date.now()}));muxLog('custom WSS packet published to '+room)}
+function customWssDisconnect(){if(customWss){try{customWss.close()}catch{}customWss=null;muxLog('custom WSS disconnected')}}
+
+
+/* -----------------------------
+   SyncPlanner: compact V8-native manifest/diff layer
+----------------------------- */
+let syncLocalManifest=null,syncRemoteManifest=null;
+function syncLogLocal(){if(!syncLocalManifest){$('syncLocal').textContent='No local manifest yet.';return}$('syncLocal').textContent=JSON.stringify({root:syncLocalManifest.root,count:syncLocalManifest.files.length,totalBytes:syncLocalManifest.totalBytes,truncated:syncLocalManifest.truncated,preview:syncLocalManifest.files.slice(0,12)},null,2)}
+function beginSyncFolderPick(){const inp=$('syncFolderInput');inp.value='';inp.click()}
+function finishSyncFolderPick(input){const files=[...(input.files||[])];const limit=5000,totalBytes=files.reduce((a,f)=>a+f.size,0);syncLocalManifest={kind:'manifest-v8',root:$('syncPathHint')?.value||'',createdAt:Date.now(),totalFiles:files.length,totalBytes,truncated:Math.max(0,files.length-limit),files:files.slice(0,limit).map(f=>({path:f.webkitRelativePath||f.name,size:f.size,mtime:f.lastModified,type:f.type||''}))};syncLogLocal();log('Sync manifest built '+files.length+' files, listed '+syncLocalManifest.files.length)}
+function exportLocalManifest(){if(!syncLocalManifest){log('no local manifest');return}navigator.clipboard?.writeText(JSON.stringify(syncLocalManifest));log('Local manifest copied if clipboard permission allowed')}
+function importRemoteManifestPrompt(){const text=prompt('Paste remote manifest JSON');if(!text)return;syncRemoteManifest=JSON.parse(text);$('syncPlan').textContent='Remote manifest imported: '+(syncRemoteManifest.files||[]).length+' listed files';}
+function sendLocalManifest(){if(!syncLocalManifest){log('no local manifest');return}sendCtrl({type:'syncManifest',manifest:syncLocalManifest,time:Date.now()})}
+function safePath(path){const parts=String(path||'').normalize('NFC').replaceAll('\\','/').split('/');return parts.length&&parts.every(p=>p&&p!=='.'&&p!=='..'&&!/[\x00-\x1f\x7f]/.test(p)&&p.length<180)&&!String(path).startsWith('/')&&!/^[a-zA-Z]:/.test(String(path))}
+function planSyncNow(){if(!syncLocalManifest||!syncRemoteManifest){$('syncPlan').textContent='Need local and remote manifests.';return}const byLocal=new Map(syncLocalManifest.files.map(f=>[f.path,f]));const byRemote=new Map(syncRemoteManifest.files.map(f=>[f.path,f]));const toSend=[],toGet=[],danger=[];for(const [path,l] of byLocal){const r=byRemote.get(path);if(!safePath(path)){danger.push({path,reason:'unsafe path'});continue}if(!r)toSend.push({path,reason:'missing remote'});else if(l.size!==r.size||Math.abs((l.mtime||0)-(r.mtime||0))>2000)toSend.push({path,reason:'local differs/newer check needed'})}for(const [path,r] of byRemote){if(!safePath(path)){danger.push({path,reason:'unsafe remote path'});continue}if(!byLocal.has(path))toGet.push({path,reason:'missing local'})}const deletesBlocked=(syncLocalManifest.truncated||syncRemoteManifest.truncated||!$('syncAllowDeletes').checked);$('syncPlan').textContent=JSON.stringify({toSend:toSend.slice(0,80),toGet:toGet.slice(0,80),danger:danger.slice(0,40),counts:{toSend:toSend.length,toGet:toGet.length,danger:danger.length},deletesBlocked,note:'execution intentionally uses BinaryTransfer later; this slice plans only'},null,2)}
+
+/* -----------------------------
+   MediaManager: compact V8-native media hooks
+----------------------------- */
+let localMediaStreams=[],remoteMediaStream=null;
+function attachMediaHooks(){if(!pc)return;pc.ontrack=e=>{remoteMediaStream ||= new MediaStream();for(const tr of e.streams?.[0]?.getTracks?.()||[e.track]){if(!remoteMediaStream.getTracks().some(x=>x.id===tr.id))remoteMediaStream.addTrack(tr)}$('remoteVideo').srcObject=remoteMediaStream;log('remote media track '+e.track.kind)}}
+async function addMediaStream(stream){localMediaStreams.push(stream);$('localVideo').srcObject=stream;for(const tr of stream.getTracks())pc.addTrack(tr,stream);log('added media tracks '+stream.getTracks().map(t=>t.kind).join(','))}
+async function startVoice(){if(!pc){log('connect/create peer first');return}await addMediaStream(await navigator.mediaDevices.getUserMedia({audio:true,video:false}))}
+async function startVideo(){if(!pc){log('connect/create peer first');return}await addMediaStream(await navigator.mediaDevices.getUserMedia({audio:true,video:true}))}
+async function startScreen(){if(!pc){log('connect/create peer first');return}await addMediaStream(await navigator.mediaDevices.getDisplayMedia({video:true,audio:true}))}
+function stopMedia(){if(!pc)return;for(const stream of localMediaStreams){for(const tr of stream.getTracks()){for(const sender of pc.getSenders())if(sender.track&&sender.track.id===tr.id){try{pc.removeTrack(sender)}catch{}}tr.stop()}}localMediaStreams=[];$('localVideo').srcObject=null;log('local media stopped; negotiationneeded should shrink tracks')}
+
+
+
+/* -----------------------------
+   Generic file populators + native QR scan
+----------------------------- */
+let populateTargetId='',qrStream=null,qrScanStop=false;
+function beginPopulateFromFile(id){populateTargetId=id;const inp=$('populateFileInput');inp.value='';inp.click()}
+async function finishPopulateFromFile(input){const file=input.files&&input.files[0];if(!file||!populateTargetId)return;try{const text=await file.text();const target=$(populateTargetId);if(target){target.value=text;target.dispatchEvent(new Event('input',{bubbles:true}));log('Populated '+populateTargetId+' from '+file.name+' ('+text.length+' chars)')}}catch(e){log('file populate failed: '+e.message)}finally{populateTargetId='';input.value=''}}
+function attachPopulateButtons(){const skip=new Set(['populateFileInput','fileInput','syncFolderInput']);document.querySelectorAll('input[type=text], textarea').forEach(el=>{if(skip.has(el.id)||!el.id||el.dataset.populated)return;el.dataset.populated='1';const b=document.createElement('button');b.type='button';b.className='fileBtn';b.title='Load file text into '+el.id;b.textContent='🔗';b.onclick=()=>beginPopulateFromFile(el.id);el.insertAdjacentElement('afterend',b)})}
+async function startQrScan(){if(!('BarcodeDetector' in window)){log('Native BarcodeDetector unavailable in this browser. Use camera app/copy/paste fallback.');return}stopQrScan();qrScanStop=false;const video=$('qrVideo');qrStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});video.srcObject=qrStream;video.style.display='block';await video.play();const detector=new BarcodeDetector({formats:['qr_code']});log('QR scan started.');(async function loop(){while(!qrScanStop){try{const codes=await detector.detect(video);if(codes.length){$('remoteCode').value=codes[0].rawValue;log('QR read into remote code: '+$('remoteCode').value.length+' chars');stopQrScan();break}}catch(e){log('QR detect error: '+e.message);stopQrScan();break}await new Promise(r=>setTimeout(r,250))}})()}
+function stopQrScan(){qrScanStop=true;if(qrStream){for(const tr of qrStream.getTracks())tr.stop();qrStream=null}const video=$('qrVideo');if(video){video.pause();video.srcObject=null;video.style.display='none'}log('QR scan stopped.')}
+
+async function ensureQrLib(){if(window.QRCode)return;await new Promise((res,rej)=>{const s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';s.onload=res;s.onerror=rej;document.head.appendChild(s)})}
+async function makeQrForText(text,label='QR'){if(!text){log('No text for QR.');return}await ensureQrLib();const q=$('localQr');q.style.display='block';q.textContent='';new QRCode(q,{text,width:256,height:256});log(label+' generated via lazy qrcodejs load.')}
+async function makeLocalQr(){await makeQrForText($('localCode').value,'Local code QR')}function hideLocalQr(){$('localQr').style.display='none';$('localQr').textContent=''}
+
+window.addEventListener('online',()=>{rlog('browser online event');startReconnectScheduler()});window.addEventListener('offline',()=>{rlog('browser offline event');startReconnectScheduler()});navigator.connection?.addEventListener?.('change',()=>{rlog('navigator.connection changed; trigger only, no IP harvesting');startReconnectScheduler()});
+loadVault();loadMuxSettings();syncLogLocal();attachPopulateButtons();setStatus('ready');log('v8 condensed merge slice loaded. Localdata vault default; V7/prompt ideas re-added as compact V8 modules, not copied.');
+</script>
+</body>
+</html>
