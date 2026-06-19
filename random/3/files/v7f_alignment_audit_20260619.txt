@@ -1,0 +1,63 @@
+V7F ALIGNMENT AUDIT — 2026-06-19
+
+Files checked:
+- p2p_qr_link_relay_eval_console_v7f_sync_crypto-1.html
+- 20260619prompts1_final_corrected.txt
+
+Automated checks performed:
+- Extracted the single <script> block from the HTML.
+- Ran node --check on extracted JS: PASS.
+- Counted prompt headings in prompt file: 89 numbered prompts, 1..89, no gaps.
+- Scanned HTML ids: 60 IDs, 60 unique, no duplicate IDs.
+- Scanned event attributes: 79 onclick/onchange/oninput handlers, all first-call handler functions found.
+- Scanned document.getElementById string refs: no missing IDs.
+- Ran a lightweight Node VM DOM-stub initialization: script init completed, but publicMethodList remained empty and publicRoomPreview stayed unchanged because renderPublicMethods() / updatePublicRoomPreview() are not called during init.
+- Counted text/textarea fields with file-populator buttons: 20 text-like fields; 10 have beginPopulateFromFile(...) buttons, 10 do not.
+
+Must-fix findings:
+1. Public rendezvous priority list is invisible at page load.
+   Cause: renderPublicMethods() exists but is not called in the init block.
+   Impact: violates priority checkbox / reorder UI requirement even though internal methods still exist.
+   Fix: call renderPublicMethods(); updatePublicRoomPreview(); near init.
+
+2. “Each input box has file mode” is only partially implemented.
+   Fields with 🔗: localCode, remoteCode, relayUrl, publicRoomSeed, publicRoomSalt, socketUrl, socketRoomSeed, socketRoomSalt, customText, evalCode.
+   Fields without 🔗: signalCryptoKey, signalCryptoRounds, publicMethodSeconds, publicRetryMaxSeconds, richSendFilter, richSourcePathHint, richReceiverSubfolder, richReceiverName, richReceiverPathHint, richBackupRootHint.
+   Fix depends on literalness: either add 🔗 to all text inputs or define exceptions for settings/filter fields.
+
+3. Strict “no library unless QR clicked” is not fully obeyed if Auto Connect is used.
+   QR library is lazy-loaded only by Make QR, but Auto Connect can import/load Nostr tools, MQTT.js, and PeerJS libraries when those public rendezvous methods are attempted.
+   If the rule means “no page-load libraries,” this is OK. If it means “no external library at all except QR button,” Auto Connect violates it.
+
+4. Random-device/random-internet is not guaranteed.
+   Nostr/MQTT/PeerJS help signaling/discovery, but the normal WebRTC DataChannel still uses STUN only. Without TURN, some NAT/firewall/mobile-carrier cases can fail.
+
+5. Rich transfer is useful but not raw-binary optimized.
+   Built-in file send uses JSON + base64 chunks. This is safe below the discovered max-message-size cliff, but slower/larger than raw ArrayBuffer chunking. Raw binary messages are currently logged/ignored by handleRichBinaryPayload().
+
+6. Voice/video/screen share only works on normal RTCPeerConnection path.
+   PeerJS fallback is bound as an app channel but does not create pc/media negotiation support. The UI logs that limitation.
+
+7. Two collapse checkboxes jointly gate auto-collapse.
+   Both autoCollapseOnConnect and publicAutoCollapse must be checked. Defaults are checked, so happy path is OK, but disabling either silently disables collapse.
+
+Recommended tiny patch:
+In the init block, change:
+
+renderRichSendList();
+renderRichSyncList();
+renderRichReceiveList();
+richLog("Richer transfer UI ready: files/folders/path hints/media/sync.");
+
+To:
+
+renderRichSendList();
+renderRichSyncList();
+renderRichReceiveList();
+renderPublicMethods();
+updatePublicRoomPreview();
+richLog("Richer transfer UI ready: files/folders/path hints/media/sync.");
+
+Best next patch if doing more:
+- Add a helper fieldFileButton(id,label='🔗') and place 🔗 on every remaining text-like input or explicitly exclude filter/timing/round settings.
+- If strict no-library is required, replace Nostr/MQTT/PeerJS library clients with native WebSocket implementations where feasible, or change the rule to “no libraries loaded until the feature is clicked/used.”
