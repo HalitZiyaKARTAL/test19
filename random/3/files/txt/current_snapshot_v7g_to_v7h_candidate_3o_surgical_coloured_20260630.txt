@@ -1,0 +1,2028 @@
+CURRENT SNAPSHOT SURGICAL COLOURED DIFF
+Created: 2026-06-30 12:29:22 UTC
+Baseline: p2p_qr_link_relay_eval_console_v7g_alignment_fixed.html
+New: current_snapshot_v7h_candidate_3o_20260630.html
+
+Format: inert/*🟢*/new surgical code/*🟡old surgical code🔴*/inert
+Note: this is generated for review, not a strict machine patch.
+
+
+
+/* ===== SURGICAL HUNK 1 | old L33-L38 | new L33-L43 ===== */
+#qrVideo{display:none;width:100%;max-height:45vh;border-radius:10px;background:#000;border:1px solid var(--border)}
+.pill{display:inline-block;padding:4px 8px;border:1px solid var(--border);border-radius:999px;color:var(--muted)}
+label{user-select:none}.mono{font-family:ui-monospace,SFMono-Regular,Consolas,monospace}.fileBtn{padding:8px 10px;min-width:42px}
+/*🟢*/.fieldShell{position:relative;display:inline-block;max-width:100%;vertical-align:top}
+.fieldShell>input,.fieldShell>textarea{width:100%;padding-right:var(--fieldFilePad,3.8ch)!important}
+.row>.fieldShell{flex:1;min-width:18ch}
+.fieldFileBtn{position:absolute;top:.15ch;right:.5ch;z-index:3;padding:.08em .35ch;min-width:0;border-radius:.45em;font-size:.82em;line-height:1;background:var(--surface3);opacity:.82}
+.fieldFileBtn:hover{opacity:1}/*🟡🔴*/
+
+details.card{display:block}
+details.card>summary{cursor:pointer;list-style:none;display:flex;align-items:center;gap:8px;margin:-2px 0 8px 0}
+
+
+/* ===== SURGICAL HUNK 2 | old L68-L80 | new L73-L93 ===== */
+.progressLine{height:8px;background:#ffffff18;border-radius:999px;overflow:hidden;min-width:160px;flex:1}
+.progressLine>span{display:block;height:100%;background:#88c0d0;width:0%}
+video.richVideo{width:100%;max-height:260px;border-radius:10px;background:#000;border:1px solid var(--border)}
+/*🟢*/.speedGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:8px;margin:8px 0}
+.speedStat{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:8px;min-height:58px}
+.speedStat b{display:block;font-size:.82em;color:var(--muted);margin-bottom:3px}
+.speedStat span{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:.94em;word-break:break-word}
+.speedExplain{background:#101828;border:1px solid #35415c;border-radius:10px;padding:8px;margin:8px 0;color:var(--muted);font-size:.93em;line-height:1.35}/*🟡🔴*/
+
+</style>
+</head>
+<body>
+<div class="box">
+/*🟢*/  <h2>Static WebRTC QR + Auto Rendezvous + Link/Socket Relay + Eval Console <span class="pill">v7h Candidate 3o</span></h2>
+  <div id="status" class="status" style="display:flex;justify-content:space-between;align-items:center;gap:12px;">
+    <span id="statusText">Not connected</span>
+    <span id="publicAutoState" style="font-size:0.85em;opacity:0.8;font-weight:normal;white-space:nowrap;">auto idle</span>
+  </div>/*🟡  <h2>Static WebRTC QR + Auto Rendezvous + Link/Socket Relay + Eval Console <span class="pill">v7g alignment-fixed</span></h2>
+  <div id="status" class="status">Not connected</div>🔴*/
+  <input id="universalFileInput" type="file" accept=".txt,.js,.json,.html,.sdp,.log,.md,text/*,application/javascript,application/json" style="display:none" onchange="finishPopulateFromFile(this)">
+  <input id="richFileInput" type="file" multiple style="display:none" onchange="finishRichFilePick(this)">
+  <input id="richFolderInput" type="file" webkitdirectory directory multiple style="display:none" onchange="finishRichFolderPick(this)">
+
+
+/* ===== SURGICAL HUNK 3 | old L97-L104 | new L110-L122 ===== */
+      <b>🔗 buttons</b> beside fields open a file picker and only populate that specific box. They do not run, send, connect, or evaluate anything automatically.
+    </div>
+    <div class="row denseControls">
+/*🟢*/      <button id="publicAutoButton" class="primary" onclick="publicToggleAutoConnect()">Auto Start Connect</button>
+      <select id="autoConnectTarget" style="max-width:140px;border-radius:10px;background:var(--surface2);color:var(--text);border:1px solid var(--border);padding:9px;">
+        <option value="new">🆕 New Device</option>
+      </select>
+      <button class="good" onclick="triggerSpeculativeReconnect(null, true)">Reconnect</button>
+      <label><input id="autoReconnectToggle" type="checkbox" checked> Automatically</label>
+      <label><input id="autoFallbackToggle" type="checkbox"> Public fallback > 300s</label>/*🟡      <button id="publicAutoButton" class="primary" onclick="publicToggleAutoConnect()">Auto Connect</button>
+      <span id="publicAutoState" class="pill">auto idle</span>🔴*/
+      <button onclick="setAllSections(true)">Expand all</button>
+      <button onclick="setAllSections(false)">Collapse all</button>
+      <label><input id="autoCollapseOnConnect" type="checkbox" checked> auto-collapse setup on connect</label>
+
+
+/* ===== SURGICAL HUNK 4 | old L115-L121 | new L133-L138 ===== */
+        <button onclick="shareLocalCode()">Share</button>
+        <button onclick="makeLocalQr()">Make QR</button>
+        <button onclick="hideLocalQr()">Hide QR</button>
+/*🟢*//*🟡        <button class="fileBtn" title="Load file text into Local connection code" onclick="beginPopulateFromFile('localCode')">🔗</button>🔴*/
+        <button class="danger" onclick="clearAll()">Reset</button>
+      </div>
+      <textarea id="localCode" readonly placeholder="Your generated offer/answer code appears here"></textarea>
+
+
+/* ===== SURGICAL HUNK 5 | old L128-L134 | new L145-L150 ===== */
+      <textarea id="remoteCode" placeholder="Paste or scan the other device's code here"></textarea>
+      <div class="row">
+        <button onclick="pasteRemoteCode()">Paste clipboard</button>
+/*🟢*//*🟡        <button class="fileBtn" title="Load file text into Remote connection code" onclick="beginPopulateFromFile('remoteCode')">🔗</button>🔴*/
+        <button onclick="startQrScan()">Read QR</button>
+        <button onclick="stopQrScan()">Stop QR</button>
+      </div>
+
+
+/* ===== SURGICAL HUNK 6 | old L149-L155 | new L165-L170 ===== */
+    <label class="small">Relay URL. Default is note.ms; replace with proxy URL only if needed.</label>
+    <div class="row">
+      <input id="relayUrl" type="text" value="https://note.ms/connector20260617testing1" style="flex:1;min-width:220px">
+/*🟢*//*🟡      <button class="fileBtn" title="Load file text into Relay URL" onclick="beginPopulateFromFile('relayUrl')">🔗</button>🔴*/
+    </div>
+    <div class="cryptoBox">
+      <div class="row">
+
+
+/* ===== SURGICAL HUNK 7 | old L180-L186 | new L195-L201 ===== */
+      Main happy path: both devices press <b>Auto Connect</b>. It loops forever through the enabled methods below, in priority order, until DataChannel opens or you press Stop auto. Manual/QR/link fallback remains available if public rendezvous fails.
+    </div>
+    <div class="row">
+/*🟢*/      <button id="publicAutoButtonSocket" class="primary" onclick="publicToggleAutoConnect()">Auto Start Connect</button>/*🟡      <button id="publicAutoButtonSocket" class="primary" onclick="publicToggleAutoConnect()">Auto Connect</button>🔴*/
+      <label><input id="publicAutoCollapse" type="checkbox" checked> collapse setup after connect</label>
+      <span id="publicState" class="pill">public rendezvous idle</span>
+    </div>
+
+
+/* ===== SURGICAL HUNK 8 | old L190-L197 | new L205-L210 ===== */
+      <label class="small" style="flex:1;min-width:180px">Randomize using<br><input id="publicRoomSalt" type="text" value="" placeholder="orange / shared phrase" oninput="updatePublicRoomPreview()" style="width:100%"></label>
+      <label><input id="publicHashRoom" type="checkbox" onchange="updatePublicRoomPreview()"> randomizer on</label>
+      <button onclick="randomizePublicRoomSalt()">Randomize using</button>
+/*🟢*//*🟡      <button class="fileBtn" title="Load file text into Auto room id" onclick="beginPopulateFromFile('publicRoomSeed')">🔗 id</button>
+      <button class="fileBtn" title="Load file text into Auto randomizer" onclick="beginPopulateFromFile('publicRoomSalt')">🔗 rand</button>🔴*/
+    </div>
+    <div class="row">
+      <span class="small">Derived room: <span id="publicRoomPreview" class="mono">cross_talk_room1</span></span>
+
+
+/* ===== SURGICAL HUNK 9 | old L213-L227 | new L226-L237 ===== */
+    <label class="small">Socket URL. GitHub Pages is HTTPS, so use <span class="mono">wss://</span> for public relay URLs. The relay accepts <span class="mono">join</span> then forwards same-room JSON messages.</label>
+    <div class="row">
+      <input id="socketUrl" type="text" value="" placeholder="wss://your-relay.example/ws" style="flex:1;min-width:220px">
+/*🟢*//*🟡      <button class="fileBtn" title="Load file text into Socket URL" onclick="beginPopulateFromFile('socketUrl')">🔗</button>🔴*/
+    </div>
+    <label class="small">Room id + optional randomizer. Randomizer OFF means the socket room is only the Room id. Randomizer ON hashes Room id + Randomize using, so both devices can type <span class="mono">apple</span> and <span class="mono">orange</span> into the two boxes and get the same hidden room.</label>
+    <div class="row">
+      <label class="small" style="flex:1;min-width:180px">Room id<br><input id="socketRoomSeed" type="text" value="cross_talk_room1" oninput="updateSocketRoomPreview()" style="width:100%"></label>
+      <label class="small" style="flex:1;min-width:180px">Randomize using<br><input id="socketRoomSalt" type="text" value="" placeholder="orange / shared phrase" oninput="updateSocketRoomPreview()" style="width:100%"></label>
+      <button onclick="randomizeSocketRoomSalt()">Randomize using</button>
+/*🟢*//*🟡      <button class="fileBtn" title="Load file text into Socket room id" onclick="beginPopulateFromFile('socketRoomSeed')">🔗 id</button>
+      <button class="fileBtn" title="Load file text into Socket randomizer" onclick="beginPopulateFromFile('socketRoomSalt')">🔗 rand</button>🔴*/
+    </div>
+    <div class="small">Derived room: <span id="socketRoomPreview" class="mono">cross_talk_room1</span></div>
+    <div class="row">
+
+
+/* ===== SURGICAL HUNK 10 | old L235-L240 | new L245-L270 ===== */
+    </div>
+  </details>
+
+/*🟢*/
+
+  <details class="card setupSection" id="reconnectionSection">
+    <summary><span class="arrow"></span><h3>Reconnection / Networking</h3></summary>
+    <div class="hint">
+      Known-peer reconnect defaults to local/known state first: standby WebRTC lanes, same-device/tab identity, saved network table, and only then optional public fallback if that toggle is enabled. This section exposes the power controls without cluttering Fast usage.
+    </div>
+    <div class="row">
+      <button class="good" onclick="tryKnownCandidateReconnect(null,true)">Try known / standby reconnect</button>
+      <button onclick="triggerSpeculativeReconnect(null,true)">Private-room public reconnect</button>
+      <button onclick="sendNetworkSnapshot()">Share network snapshot now</button>
+      <button onclick="renderReconnectReport()">Refresh report</button>
+    </div>
+    <div class="row">
+      <label><input id="newPeerAutoShareToggle" type="checkbox" checked> auto-share network info with new contacts</label>
+      <label><input id="shareNetworkInfoToggle" type="checkbox" checked onchange="setCurrentPeerShareNetwork(this.checked)"> share up-to-date network info with current peer</label>
+      <span class="small">Direct candidate replay remains semi-verified: standby lanes can be promoted; raw saved ICE candidates alone still need live SDP/signaling.</span>
+    </div>
+    <pre id="reconnectReport" class="compact">No reconnect report yet.</pre>
+  </details>/*🟡🔴*/
+  <details class="card numbered" open>
+    <summary><span class="arrow"></span><h3>5. Richer transfer</h3></summary>
+    <div class="hint">
+
+
+/* ===== SURGICAL HUNK 11 | old L254-L259 | new L284-L295 ===== */
+          </div>
+          <label class="small">Filter/list selection <input id="richSendFilter" type="text" placeholder="optional path contains..." oninput="renderRichSendList()" style="width:100%"></label>
+          <div id="richSendList" class="listBox small">No files selected yet.</div>
+/*🟢*/          <details class="small" style="margin-top:.6em">
+            <summary>Advanced binary header <span class="pill">compat</span></summary>
+            <div class="hint">Sender announces this raw-binary header setup in <code>richFileStart</code> before packets. Receiver uses sender metadata, not its own local field.</div>
+            <label class="small">Magic hex<br><input id="binMagicHex" type="text" value="56384231" placeholder="56384231" style="width:100%;font-family:monospace"></label>
+            <div class="hint">Default <code>56384231</code> keeps old raw-bin-v8 compatibility. Longer compatibility headers are allowed because the receiver reads the sender-declared metadata.</div>
+          </details>/*🟡🔴*/
+          <label class="small">Sender directory/path hint, relative or absolute; metadata only unless picker selected it
+            <input id="richSourcePathHint" type="text" placeholder="/storage/... or ./folder or C:\path" style="width:100%">
+          </label>
+
+
+/* ===== SURGICAL HUNK 12 | old L336-L341 | new L372-L379 ===== */
+          </select>
+        </label>
+        <label><input id="richAllowDeletes" type="checkbox"> allow deletions</label>
+/*🟢*/        <label><input id="syncCapFiles" type="checkbox" checked> Cap file count</label>
+        <input id="syncCapAmount" type="number" value="1000" min="1" style="width:70px;background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:4px;">/*🟡🔴*/
+        <button class="good" onclick="richExecuteSyncPlan()">Execute current plan</button>
+        <button onclick="sendRichSyncBackup()">Backup/send all picked files</button>
+      </div>
+
+
+/* ===== SURGICAL HUNK 13 | old L358-L373 | new L396-L441 ===== */
+    </details>
+
+    <pre id="richTransferLog" class="compact"></pre>
+/*🟢*/  
+<details class="transferSub speedSub" style="width:100%;margin-top:.7em">
+      <summary>Speed test / link diagnostics <span class="pill">smart 3o UI</span></summary>
+      <div class="hint">
+        Deterministic throughput test over the binary DataChannel. Sender waits for receiver <span class="mono">speedTestReady</span>, clamps packet size to browser/SCTP capability, pumps with backpressure, and receiver verifies deterministic bytes in-place. Use this to test throughput, missing chunks, duplicates, corruption/framing bugs, queue pressure, and whether ctrl/bin are actually ready.
+      </div>
+      <div class="speedGrid">
+        <div class="speedStat"><b>Connection</b><span id="speedUiConnection">not checked</span></div>
+        <div class="speedStat"><b>Ctrl / Bin</b><span id="speedUiChannels">not checked</span></div>
+        <div class="speedStat"><b>Max message</b><span id="speedUiMaxMsg">unknown</span></div>
+        <div class="speedStat"><b>Requested → actual payload</b><span id="speedUiPayload">unknown</span></div>
+        <div class="speedStat"><b>Watermarks / queue</b><span id="speedUiWater">unknown</span></div>
+        <div class="speedStat"><b>Mode / cap</b><span id="speedUiMode">32 MB, 30s cap</span></div>
+        <div class="speedStat"><b>Integrity</b><span id="speedUiIntegrity">missing/dup/mismatch shown after run</span></div>
+        <div class="speedStat"><b>Last event</b><span id="speedUiLast">idle</span></div>
+      </div>
+      <div class="row">
+        <label class="small">MB target<br><input id="speedTestMB" type="number" value="32" min="1" style="width:90px" oninput="speedRefreshUi()"></label>
+        <label class="small">Chunk bytes<br><input id="speedTestChunkBytes" type="number" value="65536" min="1024" style="width:110px" oninput="speedRefreshUi()"></label>
+        <label class="small"><input id="speedTestCapTime" type="checkbox" checked onchange="speedRefreshUi()"> cap time<br><input id="speedTestMaxSeconds" type="number" value="30" min="1" style="width:90px" oninput="speedRefreshUi()"> s</label>
+        <label><input id="speedTestContinuous" type="checkbox" onchange="speedRefreshUi()"> continuous until stop</label>
+        <button onclick="speedRefreshUi()">Refresh diagnostics</button>
+        <button class="primary" onclick="startDeterministicSpeedTest()">Start deterministic test</button>
+        <button onclick="stopDeterministicSpeedTest()">Stop test</button>
+        <button onclick="speedClearReport()">Clear speed report</button>
+      </div>
+      <div id="speedUiDetails" class="speedExplain">Open a connection, then refresh. The app will show negotiated max message size, actual payload after clamp, queue watermarks, and whether ctrl/bin are open.</div>
+      <pre id="speedTestReport" class="compact">No speed test yet.</pre>
+    </details>
+</details>/*🟡  </details>🔴*/
+
+  <details class="card numbered" open>
+    <summary><span class="arrow"></span><h3>6. Text / ping</h3></summary>
+    <div class="row">
+      <button class="primary" onclick="sendPing()">Ping</button>
+      <input id="customText" placeholder="hello" style="flex:1;min-width:160px">
+/*🟢*//*🟡      <button class="fileBtn" title="Load file text into Text box" onclick="beginPopulateFromFile('customText')">🔗</button>🔴*/
+      <button onclick="sendText()">Send text</button>
+    </div>
+/*🟢*/    
+/*🟡🔴*/
+  </details>
+
+  <details class="card numbered" open>
+
+
+/* ===== SURGICAL HUNK 14 | old L382-L388 | new L450-L455 ===== */
+      <button class="good" onclick="sendEvalFromBox()">Send eval to remote</button>
+      <button onclick="fillEvalSample()">Sample</button>
+      <button onclick="clearEvalOutput()">Clear eval output</button>
+/*🟢*//*🟡      <button class="fileBtn" title="Load file text into Eval code box" onclick="beginPopulateFromFile('evalCode')">🔗</button>🔴*/
+      <label><input id="acceptRemoteEval" type="checkbox"> Accept remote eval</label>
+      <span class="pill">remote default off</span>
+    </div>
+
+
+/* ===== SURGICAL HUNK 15 | old L407-L416 | new L474-L534 ===== */
+   State
+----------------------------- */
+
+/*🟢*/let pc=null;
+let ctrlChan=null, binChan=null;
+let channel=null; // compatibility alias for older PeerJS/control paths
+let activeWebRTCConnections=[];
+let myLocalRoutingTable=[];
+let currentPeerId=null;
+
+function cryptoRandomHex(bytes=16){
+  const a=new Uint8Array(bytes);
+  crypto.getRandomValues(a);
+  return [...a].map(x=>x.toString(16).padStart(2,"0")).join("");
+}
+
+const VAULT_KEY='p2p_v8_vault';
+let localdataVault={deviceId:null,localSecret:null,peers:{}};
+try{
+  const stored=localStorage.getItem(VAULT_KEY);
+  if(stored)localdataVault=JSON.parse(stored);
+}catch(e){}
+if(!localdataVault||typeof localdataVault!=="object")localdataVault={};
+if(!localdataVault.peers||typeof localdataVault.peers!=="object")localdataVault.peers={};
+if(!localdataVault.deviceId)localdataVault.deviceId="p"+cryptoRandomHex(4);
+if(!localdataVault.localSecret)localdataVault.localSecret=cryptoRandomHex(16);
+try{localStorage.setItem(VAULT_KEY,JSON.stringify(localdataVault))}catch(e){}
+const peerId=localdataVault.deviceId;
+const myTabToken="t"+cryptoRandomHex(4);
+/*🟡let pc=null, channel=null;🔴*/
+let pendingPings=new Map();
+/*🟢*/let fileReadyWaiters=new Map();
+let abortSignalResolver=null;
+let activeRelays=[];
+let publicRunToken=0;
+let reconnectRunToken=0;
+let publicRunStartedAt=0;
+let publicCurrentRoom="";
+let publicCurrentOffer=null;
+let publicOfferInProgress=false;
+const BIN_HIGH_WATER=128*1024*1024;
+const BIN_LOW_WATER=16*1024*1024;/*🟡🔴*/
+
+/*🟢*/function updatePeerDropdown(){
+  const sel=document.getElementById("autoConnectTarget");
+  if(!sel)return;
+  sel.textContent="";
+  const fresh=document.createElement("option");
+  fresh.value="new"; fresh.textContent="🆕 New Device";
+  sel.appendChild(fresh);
+  for(const id of Object.keys(localdataVault.peers||{})){
+    const opt=document.createElement("option");
+    opt.value=id; opt.textContent="📱 "+id.slice(0,6);
+    sel.appendChild(opt);
+  }
+}
+setTimeout(updatePeerDropdown,100);setTimeout(renderReconnectReport,200);
+/*🟡const peerId="p"+Math.random().toString(36).slice(2,10);🔴*/
+const EVAL_PREFIX="evaluate me =>";
+const EVAL_RESULT_PREFIX="evaluation result =>";
+
+
+
+/* ===== SURGICAL HUNK 16 | old L441-L447 | new L559-L566 ===== */
+  evalOutputEl.scrollTop=evalOutputEl.scrollHeight;
+}
+function setStatus(text,connected=false,warn=false){
+/*🟢*/  const textEl=document.getElementById("statusText")||statusEl;
+  textEl.textContent=text;/*🟡  statusEl.textContent=text;🔴*/
+  statusEl.className=connected?"status connected":warn?"status warn":"status";
+}
+function setRelayState(text){relayStateEl.textContent=text}
+
+
+/* ===== SURGICAL HUNK 17 | old L453-L466 | new L572-L609 ===== */
+function setPublicAutoButtons(running){
+  for(const btn of [publicAutoButtonEl,publicAutoButtonSocketEl]){
+    if(!btn)continue;
+/*🟢*/    btn.textContent=running?"Stop auto":"Auto Start Connect";/*🟡    btn.textContent=running?"Stop auto":"Auto Connect";🔴*/
+    btn.classList.toggle("danger",!!running);
+    btn.classList.toggle("primary",!running);
+  }
+}
+function publicReport(text){if(publicReportEl){publicReportEl.textContent+="["+new Date().toLocaleTimeString()+"] "+text+"\n";publicReportEl.scrollTop=publicReportEl.scrollHeight}log("AUTO: "+text)}
+/*🟢*/function connected(){
+  if(!(ctrlChan&&ctrlChan.readyState==="open"&&((binChan&&binChan.readyState==="open")||ctrlChan.peerJsFallback)))promoteStandbyLane("connected() check",true);
+  return !!(ctrlChan&&ctrlChan.readyState==="open"&&((binChan&&binChan.readyState==="open")||ctrlChan.peerJsFallback));
+}
+function controlChannel(){
+  if(ctrlChan&&ctrlChan.readyState==="open")return ctrlChan;
+  const lane=activeWebRTCConnections.find(c=>c.enabled!==false&&c.ctrlChan&&c.ctrlChan.readyState==="open"&&(!currentPeerId||!c.remotePeerId||c.remotePeerId===currentPeerId));
+  if(lane){promoteStandbyLane("control-channel fallback",true);return (ctrlChan&&ctrlChan.readyState==="open")?ctrlChan:lane.ctrlChan}
+  return null;
+}
+function sendCtrlMessage(obj){
+  const ch=controlChannel();
+  if(!ch)throw new Error("Control channel is not open");
+  ch.send(JSON.stringify(obj));
+  return true;
+}/*🟡function connected(){return channel&&channel.readyState==="open"}🔴*/
+function sleep(ms){return new Promise(r=>setTimeout(r,ms))}
+/*🟢*/function raceSleepOrSignal(ms){
+  return Promise.race([
+    new Promise(r=>setTimeout(r,ms)),
+    new Promise(r=>abortSignalResolver=r)
+  ]);
+}
+function wakeUpLoop(){
+  if(abortSignalResolver){abortSignalResolver();abortSignalResolver=null}
+}/*🟡🔴*/
+
+function collapseSetupSectionsAfterConnect(){
+  const usageToggle=document.getElementById("autoCollapseOnConnect");
+
+
+/* ===== SURGICAL HUNK 18 | old L551-L557 | new L694-L700 ===== */
+}
+async function signalPackRelayMessage(msg){
+  if(!signalCryptoIsOn())return msg;
+/*🟢*/  return {id:msg.id,from:msg.from,to:msg.to,tabToken:msg.tabToken,ts:msg.ts,box:await signalEncryptObject({kind:msg.kind,data:msg.data,replyTo:msg.replyTo})};/*🟡  return {id:msg.id,from:msg.from,to:msg.to,ts:msg.ts,box:await signalEncryptObject({kind:msg.kind,data:msg.data,replyTo:msg.replyTo})};🔴*/
+}
+async function signalUnpackRelayMessage(msg){
+  if(msg&&msg.box&&msg.box.app===SIGNAL_CRYPTO_BOX_APP){
+
+
+/* ===== SURGICAL HUNK 19 | old L566-L601 | new L709-L809 ===== */
+----------------------------- */
+
+function makePeer(){
+/*🟢*/  const localPc=new RTCPeerConnection(rtcConfig);
+  const localRouting=[];
+  const localCtrl=localPc.createDataChannel("ctrl",{negotiated:true,id:0,ordered:true});
+  const localBin=localPc.createDataChannel("bin",{negotiated:true,id:1,ordered:true});
+  activeWebRTCConnections.push({pc:localPc,ctrlChan:localCtrl,binChan:localBin});
+
+  localPc.onicecandidate=event=>{
+    if(event.candidate){
+      localRouting.push(event.candidate);
+      if(localPc===pc)myLocalRoutingTable=localRouting;
+      const peerSettings=currentPeerId&&localdataVault.peers[currentPeerId];
+      if(localCtrl.readyState==="open"&&peerSettings&&peerSettings.shareNetworkInfo){
+        try{localCtrl.send(JSON.stringify({type:"network_update",candidate:event.candidate}))}catch(e){}
+      }
+    }/*🟡  pc=new RTCPeerConnection(rtcConfig);
+  pc.oniceconnectionstatechange=()=>log("ICE state: "+pc.iceConnectionState);
+  pc.onconnectionstatechange=()=>log("Peer state: "+pc.connectionState);
+  pc.ondatachannel=event=>{
+    channel=event.channel;
+    setupChannel();
+    log("Received data channel.");🔴*/
+  };
+/*🟢*/  localPc.oniceconnectionstatechange=()=>log("ICE state: "+localPc.iceConnectionState);
+  localPc.onconnectionstatechange=()=>{
+    log("Peer state: "+localPc.connectionState);
+    if((localPc.connectionState==="disconnected"||localPc.connectionState==="failed")&&localPc===pc){
+      log("Primary connection dropped. Checking standby/same-device lane before public fallback...");
+      if(promoteStandbyLane("primary "+localPc.connectionState,true))return;
+      if(document.getElementById("autoReconnectToggle")?.checked)tryKnownCandidateReconnect(null,false);
+    }
+  };
+  localPc.ontrack=event=>handleRichRemoteTrack(event);
+
+  localCtrl.onopen=()=>{if(localBin.readyState==="open")promoteToGlobal(localPc,localCtrl,localBin,localRouting)};
+  localCtrl.onclose=()=>{if(localPc===pc&&!promoteStandbyLane("primary ctrl closed",true)){setStatus("Disconnected");log("Ctrl Channel closed.")}};
+  localCtrl.onerror=e=>{log("Ctrl Channel error.");console.error(e)};
+  localCtrl.onmessage=event=>handleChannelMessage(event.data,localCtrl).catch(err=>log("Ctrl message error: "+err.message));
+
+  localBin.binaryType="arraybuffer";
+  localBin.bufferedAmountLowThreshold=BIN_LOW_WATER;
+  localBin.onopen=()=>{if(localCtrl.readyState==="open")promoteToGlobal(localPc,localCtrl,localBin,localRouting)};
+  localBin.onclose=()=>{log("Bin channel closed.");if(localPc===pc)promoteStandbyLane("primary bin closed",true)};
+  localBin.onerror=e=>log("Bin channel error.");
+  localBin.onmessage=event=>handleRichBinaryPayload(event.data).catch(err=>richLog("Binary receive error: "+err.message));
+  return localPc;
+}
+function markConnectionRole(targetPc,role){
+  const conn=activeWebRTCConnections.find(c=>c.pc===targetPc);
+  if(conn){conn.role=role;conn.enabled=true;conn.standby=(role==="standby")}
+  return conn;
+}
+function promoteToGlobal(winnerPc,winnerCtrl,winnerBin,localRouting=[]){
+  if(connected()&&pc!==winnerPc){
+    markConnectionRole(winnerPc,"standby");
+    log("Secondary WebRTC pipe connected. Kept as standby lane; data routing not enabled yet.");
+    return;
+  }
+  pc=winnerPc;
+  ctrlChan=winnerCtrl;
+  binChan=winnerBin;
+  channel=winnerCtrl;
+  myLocalRoutingTable=localRouting;
+  markConnectionRole(winnerPc,"primary");
+  wakeUpLoop();
+  setStatus("CONNECTED — Dual Channels Open",true);
+  log("Primary WebRTC connection established.");
+  try{ctrlChan.send(JSON.stringify({type:"identity_exchange",peerId,tabToken:myTabToken,localSecretPart:localdataVault.localSecret}))}catch(e){}
+  collapseSetupSectionsAfterConnect();
+}
+function activeDataLanes(){
+  return activeWebRTCConnections.filter(c=>c.enabled&&c.binChan&&c.binChan.readyState==="open");/*🟡  pc.ontrack=event=>handleRichRemoteTrack(event);🔴*/
+}
+
+/*🟢*/function laneMatchesKnownPeer(conn){
+  if(!conn)return false;
+  if(!currentPeerId)return true;
+  return !conn.remotePeerId||conn.remotePeerId===currentPeerId||conn.remotePeerId===peerId;
+}
+function promoteStandbyLane(reason="",sameDeviceOnly=true){
+  const lane=activeWebRTCConnections.find(c=>c.enabled!==false&&c.pc!==pc&&c.ctrlChan?.readyState==="open"&&((c.binChan&&c.binChan.readyState==="open")||c.ctrlChan.peerJsFallback)&&(!sameDeviceOnly||laneMatchesKnownPeer(c)));
+  if(!lane)return false;
+  const old=activeWebRTCConnections.find(c=>c.pc===pc);
+  if(old){old.role="standby";old.standby=true}
+  pc=lane.pc;ctrlChan=lane.ctrlChan;binChan=lane.binChan;channel=lane.ctrlChan;
+  lane.role="primary";lane.standby=false;lane.enabled=true;
+  setStatus("CONNECTED — Standby lane promoted",true);
+  log("Promoted standby WebRTC lane"+(reason?" after "+reason:"")+(lane.remotePeerId?" for "+lane.remotePeerId:""));
+  try{ctrlChan.send(JSON.stringify({type:"identity_exchange",peerId,tabToken:myTabToken,localSecretPart:localdataVault.localSecret}))}catch(e){}
+  return true;
+}
+function ensureBinaryLane(){
+  if(binChan&&binChan.readyState==="open")return binChan;
+  if(promoteStandbyLane("binary lane fallback",true)&&binChan&&binChan.readyState==="open")return binChan;
+  const lane=activeWebRTCConnections.find(c=>c.enabled!==false&&c.binChan?.readyState==="open"&&(!currentPeerId||!c.remotePeerId||c.remotePeerId===currentPeerId));
+  if(lane){promoteStandbyLane("binary lane fallback",true);return lane.binChan}
+  return null;/*🟡function setupChannel(){
+  channel.onopen=()=>{
+    setStatus("CONNECTED — DataChannel open",true);
+    log("DataChannel opened.");
+    collapseSetupSectionsAfterConnect();
+  };
+  channel.onclose=()=>{
+    setStatus("Disconnected");
+    log("DataChannel closed.");
+  };
+  channel.onerror=e=>{
+    log("DataChannel error.");
+    console.error(e);
+  };
+  channel.onmessage=event=>handleChannelMessage(event.data);🔴*/
+}
+
+/*🟢*/async function handleChannelMessage(data,sourceCtrl=null){
+  if(data instanceof Blob)data=await data.arrayBuffer();
+  if(data instanceof ArrayBuffer){/*🟡async function handleChannelMessage(data){
+  if(data instanceof ArrayBuffer || data instanceof Blob){🔴*/
+    await handleRichBinaryPayload(data);
+    return;
+  }
+
+
+/* ===== SURGICAL HUNK 20 | old L609-L615 | new L817-L823 ===== */
+
+  if(msg.type==="ping"){
+    log("Received ping: "+msg.id);
+/*🟢*/    sendCtrlMessage({type:"pong",id:msg.id,time:Date.now()});/*🟡    channel.send(JSON.stringify({type:"pong",id:msg.id,time:Date.now()}));🔴*/
+    return;
+  }
+
+
+
+/* ===== SURGICAL HUNK 21 | old L625-L630 | new L833-L892 ===== */
+    return;
+  }
+
+/*🟢*/  if(msg.type==="identity_exchange"){
+    currentPeerId=msg.peerId;
+    const sourceConn=sourceCtrl&&activeWebRTCConnections.find(c=>c.ctrlChan===sourceCtrl);
+    if(sourceConn){sourceConn.remotePeerId=msg.peerId||"";sourceConn.remoteTabToken=msg.tabToken||""}
+    if(currentPeerId&&!localdataVault.peers[currentPeerId]){
+      const autoShare=document.getElementById("newPeerAutoShareToggle")?.checked!==false;
+      localdataVault.peers[currentPeerId]={shareNetworkInfo:autoShare,savedRoutingTable:[],remoteSecretPart:null,pairToken:""};
+    }
+    if(currentPeerId&&msg.localSecretPart){
+      const p=localdataVault.peers[currentPeerId];
+      p.remoteSecretPart=msg.localSecretPart;
+      sha256Hex("pair:"+[localdataVault.localSecret,p.remoteSecretPart].sort().join("|")).then(hash=>{
+        p.pairToken=hash;
+        try{localStorage.setItem(VAULT_KEY,JSON.stringify(localdataVault))}catch(e){}
+        updatePeerDropdown();
+        renderReconnectReport();
+      });
+    }
+    try{localStorage.setItem(VAULT_KEY,JSON.stringify(localdataVault))}catch(e){}
+    updatePeerDropdown();
+    renderReconnectReport();
+    const p=currentPeerId&&localdataVault.peers[currentPeerId];
+    const shareToggle=document.getElementById("shareNetworkInfoToggle");
+    if(shareToggle&&p)shareToggle.checked=!!p.shareNetworkInfo;
+    if(p&&p.shareNetworkInfo&&myLocalRoutingTable&&myLocalRoutingTable.length){
+      for(const candidate of myLocalRoutingTable){
+        try{sendCtrlMessage({type:"network_update",candidate})}catch(e){}
+      }
+      log("Shared current routing table with "+currentPeerId+" ("+myLocalRoutingTable.length+" candidate(s)).");
+    }
+    log("Identity exchanged: "+currentPeerId+(msg.tabToken?" / tab "+String(msg.tabToken).slice(0,6):""));
+    return;
+  }
+
+  if(msg.type==="network_update"){
+    if(currentPeerId&&localdataVault.peers[currentPeerId]){
+      localdataVault.peers[currentPeerId].savedRoutingTable.push(msg.candidate);
+      if(localdataVault.peers[currentPeerId].savedRoutingTable.length>50)localdataVault.peers[currentPeerId].savedRoutingTable.shift();
+      try{localStorage.setItem(VAULT_KEY,JSON.stringify(localdataVault))}catch(e){}
+    }
+    return;
+  }
+
+  if(msg.type==="richFileReady"){
+    const cb=fileReadyWaiters.get(msg.id);
+    if(cb)cb();
+    return;
+  }
+
+
+  if(msg.type==="speedTestStart"){speedStartReceive(msg);return}
+  if(msg.type==="speedTestReady"){speedHandleReady(msg);return}
+  if(msg.type==="speedTestEnd"){speedFinishReceive(msg);return}
+/*🟡🔴*/
+  if(String(msg.type||"").startsWith("rich")){
+    await handleRichMessage(msg);
+    return;
+
+
+/* ===== SURGICAL HUNK 22 | old L633-L716 | new L895-L1008 ===== */
+  log("Received unknown message: "+data);
+}
+
+/*🟢*/async function waitForIceGatheringComplete(targetPc=pc){
+  if(!targetPc)return;
+  if(targetPc.iceGatheringState==="complete")return;/*🟡async function waitForIceGatheringComplete(){
+  if(pc.iceGatheringState==="complete")return;🔴*/
+  await new Promise(resolve=>{
+    let done=false;
+    const finish=()=>{if(done)return;done=true;resolve()};
+/*🟢*/    targetPc.addEventListener("icegatheringstatechange",()=>{if(targetPc.iceGatheringState==="complete")finish()});
+    targetPc.addEventListener("icecandidate",event=>{if(!event.candidate)finish()});/*🟡    pc.addEventListener("icegatheringstatechange",()=>{if(pc.iceGatheringState==="complete")finish()});
+    pc.addEventListener("icecandidate",event=>{if(!event.candidate)finish()});🔴*/
+    setTimeout(finish,5000);
+  });
+}
+
+async function makeHostCode(){
+  clearConnectionOnly();
+/*🟢*/  const localPc=makePeer();/*🟡  makePeer();
+  channel=pc.createDataChannel("ping");
+  setupChannel();🔴*/
+  log("Creating host offer...");
+/*🟢*/  const offer=await localPc.createOffer();
+  await localPc.setLocalDescription(offer);
+  await waitForIceGatheringComplete(localPc);
+  localCodeEl.value=encodeCode(localPc.localDescription);/*🟡  const offer=await pc.createOffer();
+  await pc.setLocalDescription(offer);
+  await waitForIceGatheringComplete();
+  localCodeEl.value=encodeCode(pc.localDescription);🔴*/
+  log("Host code created: "+shortCodeInfo(localCodeEl.value)+".");
+}
+
+async function joinFromHostCode(){
+  clearConnectionOnly();
+/*🟢*/  const localPc=makePeer();/*🟡  makePeer();
+🔴*/
+  let hostOffer;
+/*🟢*/  try{hostOffer=decodeCode(remoteCodeEl.value)}catch(err){log("Bad host code: "+err.message);return}/*🟡  try{hostOffer=decodeCode(remoteCodeEl.value)}
+  catch(err){log("Bad host code: "+err.message);return}
+🔴*/
+  log("Reading host code...");
+/*🟢*/  await localPc.setRemoteDescription(hostOffer);/*🟡  await pc.setRemoteDescription(hostOffer);
+🔴*/
+  log("Creating reply code...");
+/*🟢*/  const answer=await localPc.createAnswer();
+  await localPc.setLocalDescription(answer);
+  await waitForIceGatheringComplete(localPc);
+  localCodeEl.value=encodeCode(localPc.localDescription);/*🟡  const answer=await pc.createAnswer();
+  await pc.setLocalDescription(answer);
+  await waitForIceGatheringComplete();
+
+  localCodeEl.value=encodeCode(pc.localDescription);🔴*/
+  log("Reply code created: "+shortCodeInfo(localCodeEl.value)+".");
+}
+
+async function finishHostConnection(){
+/*🟢*//*🟡  if(!pc){log("No host peer exists. First click Host: make code.");return}
+🔴*/
+  let answer;
+/*🟢*/  try{answer=decodeCode(remoteCodeEl.value)}catch(err){log("Bad answer code: "+err.message);return}/*🟡  try{answer=decodeCode(remoteCodeEl.value)}
+  catch(err){log("Bad answer code: "+err.message);return}
+🔴*/
+  log("Applying reply code...");
+/*🟢*/  let applied=false;
+  for(const conn of activeWebRTCConnections){
+    if(conn.pc&&conn.pc.signalingState==="have-local-offer"){
+      try{await conn.pc.setRemoteDescription(answer);applied=true;break}catch(e){}
+    }
+  }
+  if(!applied)log("No waiting host connection found. Click 'Host: make code' first.");
+  else log("Reply accepted. Waiting for Dual Channels to open...");/*🟡  await pc.setRemoteDescription(answer);
+  log("Reply accepted. Waiting for DataChannel open...");🔴*/
+}
+
+function sendPing(){
+  if(!connected()){log("Cannot ping: not connected yet.");return}
+  const id=Math.random().toString(36).slice(2);
+  pendingPings.set(id,performance.now());
+/*🟢*/  sendCtrlMessage({type:"ping",id,time:Date.now()});/*🟡  channel.send(JSON.stringify({type:"ping",id,time:Date.now()}));🔴*/
+  log("Sent ping: "+id);
+}
+
+function sendText(){
+  if(!connected()){log("Cannot send: not connected yet.");return}
+  const text=document.getElementById("customText").value||"hello";
+/*🟢*/  sendCtrlMessage({type:"text",text,time:Date.now()});/*🟡  channel.send(JSON.stringify({type:"text",text,time:Date.now()}));🔴*/
+  log("Sent text: "+text);
+}
+
+function clearConnectionOnly(){
+/*🟢*/  if(ctrlChan){try{ctrlChan.close()}catch(e){}}
+  if(binChan){try{binChan.close()}catch(e){}}
+  if(channel&&channel!==ctrlChan){try{channel.close()}catch(e){}}
+  if(pc){try{pc.close?.()}catch(e){}}
+  for(const conn of activeWebRTCConnections){
+    try{conn.ctrlChan?.close()}catch(e){}
+    try{conn.binChan?.close()}catch(e){}
+    try{conn.pc?.close?.()}catch(e){}
+  }
+  activeWebRTCConnections=[];
+  pc=null;ctrlChan=null;binChan=null;channel=null;/*🟡  if(channel){try{channel.close()}catch{}}
+  if(pc){try{pc.close()}catch{}}
+  pc=null;
+  channel=null;🔴*/
+  pendingPings.clear();
+  setStatus("Not connected");
+/*🟢*/}
+
+async function triggerSpeculativeReconnect(targetIdOverride=null,userRequested=true){
+  const target=targetIdOverride||currentPeerId;
+  if(!target||!localdataVault.peers[target]){log("No known peer ID to reconnect to.");return}
+  const peerData=localdataVault.peers[target];
+  if(!peerData.pairToken){log("No pair token for this peer yet. Use normal Auto Start Connect once first.");return}
+  const sortedIds=[peerId,target].sort().join("|");
+  const hiddenRoom="v8_recon_"+(await sha256Hex("reconnect:"+sortedIds+":"+peerData.pairToken)).slice(0,32);
+  if(userRequested){
+    log("Starting private pair-token reconnect relay for "+target+".");
+    clearConnectionOnly();
+    await publicAutoConnect(hiddenRoom);
+    return;
+  }
+  const currentRecToken=++reconnectRunToken;
+  if(document.getElementById("autoFallbackToggle")?.checked){
+    log("Known-peer direct reconnect needs live signaling; public fallback scheduled for 300s.");
+    setTimeout(async()=>{
+      if(currentRecToken===reconnectRunToken&&!connected()){
+        log("Public reconnect fallback: starting symmetric private relay room...");
+        await publicAutoConnect(hiddenRoom);
+      }
+    },300000);
+  }else{
+    log("Known-peer direct reconnect has no live signaling path. Enable public fallback or press Reconnect for private relay.");
+  }/*🟡🔴*/
+}
+
+function clearAll(){
+
+
+/* ===== SURGICAL HUNK 23 | old L737-L746 | new L1029-L1080 ===== */
+  relayAnsweredOfferIds.clear();
+  relayAppliedAnswerIds.clear();
+  relayLastState=null;
+/*🟢*/  publicOfferPeer=null;/*🟡🔴*/
+
+  log("Reset. My peer id: "+peerId);
+}
+
+/*🟢*/
+function currentPeerSettings(){return currentPeerId&&localdataVault.peers?localdataVault.peers[currentPeerId]:null}
+function setCurrentPeerShareNetwork(on){
+  const p=currentPeerSettings();
+  if(!p){log("No current peer yet; this toggle will apply after identity exchange.");return}
+  p.shareNetworkInfo=!!on;
+  try{localStorage.setItem(VAULT_KEY,JSON.stringify(localdataVault))}catch(e){}
+  renderReconnectReport();
+  log("Network info sharing for "+currentPeerId+": "+(p.shareNetworkInfo?"on":"off"));
+}
+function sendNetworkSnapshot(){
+  const p=currentPeerSettings();
+  if(!connected()){log("Cannot share network snapshot: not connected.");return}
+  if(p&&p.shareNetworkInfo===false){log("Current peer network sharing is off; not sending snapshot.");return}
+  let sent=0;
+  for(const candidate of myLocalRoutingTable||[]){try{sendCtrlMessage({type:"network_update",candidate});sent++}catch(e){}}
+  log("Shared network snapshot: "+sent+" candidate(s).");
+  renderReconnectReport();
+}
+function renderReconnectReport(){
+  const box=document.getElementById("reconnectReport");
+  if(!box)return;
+  const p=currentPeerSettings();
+  const lanes=activeWebRTCConnections.map((c,i)=>({i,role:c.role||"",enabled:c.enabled!==false,pc:c.pc?.connectionState||"?",ice:c.pc?.iceConnectionState||"?",ctrl:c.ctrlChan?.readyState||"?",bin:c.binChan?.readyState||"?",remotePeer:c.remotePeerId||"?",remoteTab:c.remoteTabToken?String(c.remoteTabToken).slice(0,8):"?"}));
+  box.textContent=JSON.stringify({currentPeerId,currentPeerKnown:!!p,shareNetworkInfo:p?.shareNetworkInfo??null,savedRoutes:p?.savedRoutingTable?.length||0,myRoutes:myLocalRoutingTable?.length||0,autoReconnect:document.getElementById("autoReconnectToggle")?.checked??null,publicFallbackAfter300s:document.getElementById("autoFallbackToggle")?.checked??null,lanes},null,2);
+}
+async function tryKnownCandidateReconnect(targetIdOverride=null,userRequested=true){
+  const target=targetIdOverride||currentPeerId;
+  if(promoteStandbyLane("known-peer reconnect",true)){renderReconnectReport();return true}
+  if(!target||!localdataVault.peers[target]){log("No known peer ID/routes for direct reconnect yet.");renderReconnectReport();return false}
+  const p=localdataVault.peers[target];
+  log("Known reconnect check: "+target+" has "+(p.savedRoutingTable?.length||0)+" saved candidate(s). Raw candidates alone still need live SDP/control; trying standby lane first, then optional public fallback only if enabled.");
+  renderReconnectReport();
+  if(userRequested){
+    if(document.getElementById("autoFallbackToggle")?.checked){await triggerSpeculativeReconnect(target,true);return true}
+    log("Public fallback is off. Direct saved-candidate reconnect remains semi-verified/scaffolded until live SDP exchange exists.");
+  }else if(document.getElementById("autoFallbackToggle")?.checked){
+    await triggerSpeculativeReconnect(target,false);
+  }
+  return false;
+}/*🟡🔴*/
+/* -----------------------------
+   Rich transfer / media
+----------------------------- */
+
+
+/* ===== SURGICAL HUNK 24 | old L749-L759 | new L1083-L1098 ===== */
+const RICH_DEFAULT_CHUNK_BYTES=64*1024;
+const RICH_PEERJS_CHUNK_BYTES=16*1024;
+const RICH_BUFFER_LIMIT=8*1024*1024;
+/*🟢*/const RICH_PENDING_BINARY_LIMIT=100*1024*1024;
+const RICH_FRAME_DIAG_SLICE=1024;/*🟡🔴*/
+let qrCodeLoadPromise=null;
+let richTransferItems=[];
+let richSyncItems=[];
+let richFolderPickMode="send";
+let richIncoming=new Map();
+/*🟢*/let richPendingBinary=[];
+let richPendingBinaryBytes=0;
+let richFrameDiagCounter=0;/*🟡🔴*/
+let richCompletedDownloads=[];
+let richReceiveDirHandle=null;
+let richLocalMediaStream=null;
+
+
+/* ===== SURGICAL HUNK 25 | old L784-L789 | new L1123-L1239 ===== */
+}
+function richMakeId(prefix="rich"){return prefix+"_"+Date.now().toString(36)+"_"+Math.random().toString(36).slice(2)}
+function richCurrentChunkBytes(){return channel&&channel.peerJsFallback?RICH_PEERJS_CHUNK_BYTES:RICH_DEFAULT_CHUNK_BYTES}
+/*🟢*/function richCleanHex(value,fallback="56384231"){
+  let hex=String(value||"").replace(/[^0-9a-f]/gi,"").toUpperCase();
+  if(!hex)hex=fallback;
+  if(hex.length%2)hex="0"+hex;
+  return hex||fallback;
+}
+function richHexToBytes(hex){
+  hex=richCleanHex(hex,"56384231");
+  const out=new Uint8Array(hex.length/2);
+  for(let i=0;i<out.length;i++)out[i]=parseInt(hex.slice(i*2,i*2+2),16);
+  return out;
+}
+function richBytesStartWith(bytes,prefix){
+  if(bytes.length<prefix.length)return false;
+  for(let i=0;i<prefix.length;i++)if(bytes[i]!==prefix[i])return false;
+  return true;
+}
+function richBytesToHexSample(bytes,limit=RICH_FRAME_DIAG_SLICE){
+  const sample=bytes.subarray(0,Math.min(bytes.byteLength,limit));
+  let hex="";
+  for(const b of sample)hex+=b.toString(16).padStart(2,"0").toUpperCase();
+  return hex;
+}
+function richFindMagicOffset(bytes,magic,limit=RICH_FRAME_DIAG_SLICE){
+  if(!magic||!magic.length||bytes.length<magic.length)return -1;
+  const max=Math.min(bytes.length-magic.length,limit);
+  outer:for(let i=0;i<=max;i++){
+    for(let j=0;j<magic.length;j++)if(bytes[i+j]!==magic[j])continue outer;
+    return i;
+  }
+  return -1;
+}
+function richPendingBinaryStats(){return {count:richPendingBinary.length,bytes:richPendingBinaryBytes,limit:RICH_PENDING_BINARY_LIMIT}}
+function richSendFrameDiagnostic(kind,item={},extra={}){
+  richFrameDiagCounter++;
+  const includeSample=!!item.sampleHex&&(richFrameDiagCounter<=3||richFrameDiagCounter%16===0||extra.forceSample);
+  const msg={
+    type:"richBinaryFrameDiag",kind,time:Date.now(),pending:richPendingBinaryStats(),
+    pendingId:item.id||"",arrivalTime:item.arrivalTime||0,ageMs:item.arrivalTime?Date.now()-item.arrivalTime:0,
+    size:item.size||0,reason:item.reason||"",defaultHeaderAt:item.defaultHeaderAt??-1,
+    sampleBytes:includeSample?Math.min(item.size||0,RICH_FRAME_DIAG_SLICE):0,
+    sampleHex:includeSample?item.sampleHex:"",...extra
+  };
+  try{sendCtrlMessage(msg)}catch(err){richLog("Frame diagnostic not sent: "+err.message)}
+}
+function richStorePendingBinary(bytes,reason="unmatched binary frame"){
+  let stored=bytes.slice(0);
+  let truncated=false;
+  if(stored.byteLength>RICH_PENDING_BINARY_LIMIT){stored=stored.slice(0,RICH_PENDING_BINARY_LIMIT);truncated=true}
+  while(richPendingBinaryBytes+stored.byteLength>RICH_PENDING_BINARY_LIMIT&&richPendingBinary.length){
+    const dropped=richPendingBinary.shift();
+    richPendingBinaryBytes-=dropped.bytes.byteLength;
+    richLog("Dropped pending binary frame "+dropped.id+" to keep 100 MB buffer cap.");
+  }
+  if(richPendingBinaryBytes+stored.byteLength>RICH_PENDING_BINARY_LIMIT){
+    richLog("Could not retain pending binary frame: buffer cap still full after cleanup.");
+    return;
+  }
+  const item={
+    id:richMakeId("pendingBin"),arrivalTime:Date.now(),size:bytes.byteLength,bytes:stored,reason,
+    sampleHex:richBytesToHexSample(bytes),defaultHeaderAt:richFindMagicOffset(bytes,richHexToBytes("56384231"))
+  };
+  if(truncated)item.reason+="; stored first 100 MB only";
+  richPendingBinary.push(item);
+  richPendingBinaryBytes+=stored.byteLength;
+  richLog("Stored pending binary frame "+item.id+" ("+richFormatBytes(stored.byteLength)+" / 100 MB cap, default header at "+item.defaultHeaderAt+").");
+  richSendFrameDiagnostic("pending-binary-stored",item,{forceSample:true});
+}
+async function richRetryPendingBinaryForRecord(rec,reason="metadata available"){
+  if(!richPendingBinary.length)return;
+  const keep=[];
+  let consumed=0;
+  for(const item of richPendingBinary){
+    let ok=false;
+    try{ok=await richTryConsumeBinaryForRecord(item.bytes,rec,{pendingId:item.id,allowDefaultFallback:true})}catch(err){richLog("Pending binary retry failed for "+item.id+": "+err.message)}
+    if(ok){consumed++;richPendingBinaryBytes-=item.bytes.byteLength;richSendFrameDiagnostic("pending-binary-consumed",item,{matchedId:rec.meta?.id||"",reason})}
+    else keep.push(item);
+  }
+  richPendingBinary=keep;
+  if(consumed)richLog("Retried pending binary after "+reason+": "+consumed+" consumed, "+richPendingBinary.length+" still pending.");
+}
+function richBinaryFrameConfig(){
+  const magicHex=richCleanHex(richEl("binMagicHex")?.value||"56384231","56384231");
+  return {magicHex,magicBytes:magicHex.length/2,layout:"magic,u16_idLen,u32_index,utf8_id,payload"};
+}
+function richBuildRawHeader(id,index,frame){
+  const magic=richHexToBytes(frame?.magicHex||"56384231");
+  const idBytes=new TextEncoder().encode(id);
+  const header=new Uint8Array(magic.length+2+4+idBytes.length);
+  const dv=new DataView(header.buffer);
+  header.set(magic,0);
+  dv.setUint16(magic.length,idBytes.length);
+  dv.setUint32(magic.length+2,index);
+  header.set(idBytes,magic.length+6);
+  return header;
+}
+function richParseRawPacketForRecord(bytes,rec,forceMagicHex=""){
+  const meta=rec?.meta||{};
+  const frame=meta.frame||{};
+  const magic=richHexToBytes(forceMagicHex||frame.magicHex||meta.binMagicHex||"56384231");
+  if(!richBytesStartWith(bytes,magic)||bytes.length<magic.length+6)return null;
+  const dv=new DataView(bytes.buffer,bytes.byteOffset,bytes.byteLength);
+  const idLen=dv.getUint16(magic.length);
+  const index=dv.getUint32(magic.length+2);
+  const idStart=magic.length+6;
+  const payloadStart=idStart+idLen;
+  if(bytes.length<payloadStart)return null;
+  const parsedId=new TextDecoder().decode(bytes.subarray(idStart,payloadStart));
+  if(parsedId!==meta.id)return null;
+  return {id:parsedId,index,payload:bytes.subarray(payloadStart),magicHex:richCleanHex(forceMagicHex||frame.magicHex||meta.binMagicHex||"56384231","56384231")};
+}/*🟡🔴*/
+async function richSha256Base64Url(bytes){
+  if(!crypto.subtle)throw new Error("WebCrypto SHA-256 unavailable");
+  const data=bytes instanceof Uint8Array?bytes:new Uint8Array(bytes);
+
+
+/* ===== SURGICAL HUNK 26 | old L800-L805 | new L1250-L1257 ===== */
+  richTransferItems=[];
+  richSyncItems=[];
+  richIncoming.clear();
+/*🟢*/  richPendingBinary=[];
+  richPendingBinaryBytes=0;/*🟡🔴*/
+  richCompletedDownloads.forEach(item=>{try{URL.revokeObjectURL(item.url)}catch{}});
+  richCompletedDownloads=[];
+  if(render){renderRichSendList();renderRichSyncList();renderRichReceiveList()}
+
+
+/* ===== SURGICAL HUNK 27 | old L881-L886 | new L1333-L1351 ===== */
+  for(let i=0;i<enabled.length;i++)await richSendOneFile(enabled[i].file,enabled[i].relativePath||enabled[i].file.name,{batchId,batchIndex:i,batchTotal:enabled.length,...options});
+  richLog("Finished queue send: "+enabled.length+" file(s).")
+}
+/*🟢*/async function waitBinLow(ch=null){
+  ch=ch||ensureBinaryLane();
+  if(!ch||ch.readyState!=="open"||ch.bufferedAmount<=BIN_HIGH_WATER)return;
+  ch.bufferedAmountLowThreshold=BIN_LOW_WATER;
+  await new Promise(resolve=>{ch.addEventListener("bufferedamountlow",resolve,{once:true})});
+}
+async function waitBinOpen(timeout=5000){
+  if(ensureBinaryLane())return true;
+  const start=Date.now();
+  while(Date.now()-start<timeout){if(ensureBinaryLane())return true;await sleep(50)}
+  return false;
+}
+/*🟡🔴*/
+async function richSendOneFile(file,relativePath,batch){
+  const id=richMakeId("file");
+  const meta={
+
+
+/* ===== SURGICAL HUNK 28 | old L892-L917 | new L1357-L1422 ===== */
+    receiverSubfolder:batch.receiverSubfolder ?? (richEl("richReceiverSubfolder")?.value.trim()||""),
+    receiverName:batch.receiverName ?? (richEl("richReceiverName")?.value.trim()||"")
+  };
+/*🟢*/  const chunkBytes=(ctrlChan&&ctrlChan.peerJsFallback)?RICH_PEERJS_CHUNK_BYTES:64*1024;/*🟡  const chunkBytes=richCurrentChunkBytes();🔴*/
+  meta.chunkBytes=chunkBytes;
+/*🟢*/
+  if(ctrlChan&&ctrlChan.peerJsFallback){
+    meta.transport="peerjs-fallback";
+    sendCtrlMessage(meta);
+    const chunkHashes=[];
+    let index=0;
+    for(let offset=0;offset<file.size;offset+=chunkBytes,index++){
+      const bytes=new Uint8Array(await file.slice(offset,Math.min(offset+chunkBytes,file.size)).arrayBuffer());
+      let chunkHash="";
+      try{chunkHash=await richSha256Base64Url(bytes);chunkHashes[index]=chunkHash}catch(err){chunkHashes[index]="";if(index===0)richLog("Chunk hash disabled/unavailable: "+err.message)}
+      sendCtrlMessage({type:"richFileChunk",id,index,offset,bytes:bytes.length,hash:chunkHash,data:bytesToBase64Url(bytes)});
+      await richWaitDataChannelDrain();
+    }
+    sendCtrlMessage({type:"richFileEnd",id,chunks:index,size:file.size,chunkBytes,chunkHashes});
+    richLog("Sent "+relativePath+" ("+richFormatBytes(file.size)+", chunks "+chunkBytes+" bytes, PeerJS fallback).");
+    return;
+  }
+
+  meta.wireMode="raw-bin-v8";
+  const binFrame=richBinaryFrameConfig();
+  meta.frame=binFrame;
+  meta.binMagicHex=binFrame.magicHex;
+  let fileReadyResolver=null,fileReadyRejector=null;
+  const readyPromise=new Promise((resolve,reject)=>{fileReadyResolver=resolve;fileReadyRejector=reject});
+  const timer=setTimeout(()=>{fileReadyWaiters.delete(id);fileReadyRejector(new Error("Receiver did not ACK richFileStart: "+id))},10000);
+  fileReadyWaiters.set(id,()=>{clearTimeout(timer);fileReadyWaiters.delete(id);fileReadyResolver()});
+  sendCtrlMessage(meta);
+  if(!(await waitBinOpen())){clearTimeout(timer);fileReadyWaiters.delete(id);throw new Error("Binary channel failed to open in time.")}
+  await readyPromise;
+/*🟡  meta.transport=channel&&channel.peerJsFallback?"peerjs-fallback":"webrtc-datachannel";
+  channel.send(JSON.stringify(meta));
+  const chunkHashes=[];🔴*/
+  let index=0;
+/*🟢*/  const reader=file.stream().getReader();
+  while(true){
+    const lane=ensureBinaryLane();
+    if(!lane)throw new Error("Binary channel closed and no standby lane available");
+    const {done,value}=await reader.read();
+    if(done)break;
+    let off=0;
+    while(off<value.byteLength){
+      const activeLane=ensureBinaryLane();
+      if(!activeLane)throw new Error("Binary channel closed during send and no standby lane available");
+      await waitBinLow(activeLane);
+      const part=value.subarray(off,off+chunkBytes);
+      const header=richBuildRawHeader(id,index,binFrame);
+      const combined=new Uint8Array(header.byteLength+part.byteLength);
+      combined.set(header,0);combined.set(part,header.byteLength);
+      activeLane.send(combined.buffer);
+      off+=part.byteLength;
+      index++;
+    }/*🟡  for(let offset=0;offset<file.size;offset+=chunkBytes,index++){
+    const bytes=new Uint8Array(await file.slice(offset,Math.min(offset+chunkBytes,file.size)).arrayBuffer());
+    let chunkHash="";
+    try{chunkHash=await richSha256Base64Url(bytes);chunkHashes[index]=chunkHash}catch(err){chunkHashes[index]="";if(index===0)richLog("Chunk hash disabled/unavailable: "+err.message)}
+    channel.send(JSON.stringify({type:"richFileChunk",id,index,offset,bytes:bytes.length,hash:chunkHash,data:bytesToBase64Url(bytes)}));
+    await richWaitDataChannelDrain();🔴*/
+  }
+/*🟢*/  sendCtrlMessage({type:"richFileEnd",id,chunks:index,size:file.size,frame:binFrame});
+  richLog("Sent "+relativePath+" (Raw ArrayBuffer stream, magic "+binFrame.magicHex+").");/*🟡  channel.send(JSON.stringify({type:"richFileEnd",id,chunks:index,size:file.size,chunkBytes,chunkHashes}));
+  richLog("Sent "+relativePath+" ("+richFormatBytes(file.size)+", chunks "+chunkBytes+" bytes, "+meta.transport+").")🔴*/
+}
+function sendRichPathHint(){
+  if(!connected()){richLog("Cannot send path hint: not connected yet.");return}
+  const msg={type:"richPathHint",id:richMakeId("path"),fromPath:richEl("richSourcePathHint")?.value.trim()||"",toPath:richEl("richReceiverPathHint")?.value.trim()||"",subfolder:richEl("richReceiverSubfolder")?.value.trim()||"",name:richEl("richReceiverName")?.value.trim()||"",time:Date.now()};
+/*🟢*/  sendCtrlMessage(msg);/*🟡  channel.send(JSON.stringify(msg));🔴*/
+  richLog("Sent path hint / no-list request.")
+}
+async function pickRichReceiveFolder(){
+
+
+/* ===== SURGICAL HUNK 29 | old L960-L965 | new L1465-L1471 ===== */
+  }
+  richIncoming.set(meta.id,rec);
+  renderRichReceiveList();
+/*🟢*/  await richRetryPendingBinaryForRecord(rec,"richFileStart metadata");/*🟡🔴*/
+}
+async function richReceiveFileChunk(msg){
+  const rec=richIncoming.get(msg.id);
+
+
+/* ===== SURGICAL HUNK 30 | old L1040-L1053 | new L1546-L1561 ===== */
+  if(!connected()){richLog("Cannot send sync manifest: not connected yet.");return}
+  if(!richSyncItems.length){richLog("No sync folder selected.");return}
+  const full=richManifestFromItems();
+/*🟢*/  const capOn=!!richEl("syncCapFiles")?.checked;
+  const capAmount=Math.max(1,Number(richEl("syncCapAmount")?.value)||1000);
+  const previewLimit=capOn?capAmount:full.files.length;/*🟡  const previewLimit=Number(richEl("richManifestLimit")?.value)||5000;🔴*/
+  const files=full.files.slice(0,previewLimit);
+/*🟢*/  sendCtrlMessage({type:"richSyncManifest",id:richMakeId("manifest"),rootHint:full.rootHint,fileCount:full.fileCount,totalBytes:full.totalBytes,files,truncated:full.fileCount-files.length,mode:richEl("richSyncMode")?.value||"both",allowDeletes:!!richEl("richAllowDeletes")?.checked,time:Date.now()});/*🟡  channel.send(JSON.stringify({type:"richSyncManifest",id:richMakeId("manifest"),rootHint:full.rootHint,fileCount:full.fileCount,totalBytes:full.totalBytes,files,truncated:full.fileCount-files.length,mode:richEl("richSyncMode")?.value||"both",allowDeletes:!!richEl("richAllowDeletes")?.checked,time:Date.now()}));🔴*/
+  richLog("Sent sync manifest: "+full.fileCount+" file(s), "+richFormatBytes(full.totalBytes)+".")
+}
+function requestRichSyncManifest(){
+  if(!connected()){richLog("Cannot request manifest: not connected yet.");return}
+/*🟢*/  sendCtrlMessage({type:"richSyncManifestRequest",id:richMakeId("manifestReq"),mode:richEl("richSyncMode")?.value||"both",time:Date.now()});/*🟡  channel.send(JSON.stringify({type:"richSyncManifestRequest",id:richMakeId("manifestReq"),mode:richEl("richSyncMode")?.value||"both",time:Date.now()}));🔴*/
+  richLog("Requested peer sync manifest.")
+}
+function richBuildSyncPlan(mode=richEl("richSyncMode")?.value||"both"){
+
+
+/* ===== SURGICAL HUNK 31 | old L1112-L1123 | new L1620-L1631 ===== */
+  const sendItems=p.send.map(path=>local.get(path)).filter(Boolean).map((item,index)=>({...item,enabled:true,index}));
+  if(sendItems.length)await sendRichSelectedFiles(sendItems,{syncBatchId:richMakeId("syncSend"),syncMode:p.mode,reason:"sync plan"});
+  if(p.request.length){
+/*🟢*/    sendCtrlMessage({type:"richSyncFileRequest",id:richMakeId("fileReq"),paths:p.request,mode:p.mode,time:Date.now()});/*🟡    channel.send(JSON.stringify({type:"richSyncFileRequest",id:richMakeId("fileReq"),paths:p.request,mode:p.mode,time:Date.now()}));🔴*/
+    richLog("Requested "+p.request.length+" file(s) from peer.")
+  }
+  const allow=!!richEl("richAllowDeletes")?.checked;
+  if(allow&&p.deleteRemote.length){
+/*🟢*/    sendCtrlMessage({type:"richSyncDeleteRequest",id:richMakeId("delReq"),paths:p.deleteRemote,mode:p.mode,time:Date.now()});/*🟡    channel.send(JSON.stringify({type:"richSyncDeleteRequest",id:richMakeId("delReq"),paths:p.deleteRemote,mode:p.mode,time:Date.now()}));🔴*/
+    richLog("Sent delete request for "+p.deleteRemote.length+" remote extra file(s).")
+  }else if(p.deleteRemote.length)richLog("Remote delete skipped because allow deletions is off.");
+  if(allow&&p.deleteLocal.length){
+
+
+/* ===== SURGICAL HUNK 32 | old L1157-L1170 | new L1665-L1865 ===== */
+  for(const path of paths){try{await richDeletePathFromReceiveFolder(path);ok++}catch(err){fail++;richLog("Local delete failed for "+path+": "+err.message)}}
+  richLog("Local delete plan applied to picked save folder: "+ok+" deleted, "+fail+" failed.")
+}
+/*🟢*/
+let speedTestStop=false;
+let speedReceiveTests=new Map();
+let speedReadyWaiters=new Map();
+let speedPendingBinary=new Map();
+let speedPendingBinaryBytes=0;
+let speedSendPlans=new Map();
+let speedLastPlan=null;
+let speedLastReceive=null;
+let speedLastUiNote="idle";
+const SPEED_PENDING_BINARY_MAX=100*1024*1024;
+const SPEED_MAGIC=0x53504454; // SPDT
+const SPEED_HEADER_BYTES=12;
+const SPEED_ERROR_SAMPLE_MAX=16;
+function speedSetUi(id,text){const el=richEl(id);if(el)el.textContent=String(text)}
+function speedMaxText(n){return n===Number.MAX_SAFE_INTEGER?"memory":richFormatBytes(n)}
+function speedRefreshUi(plan=speedLastPlan,note=""){
+  if(note)speedLastUiNote=note;
+  const lane=binChan,ctrl=ctrlChan,ctrlState=ctrl?.readyState||"none",binState=lane?.readyState||"none",connectedNow=ctrlState==="open"&&binState==="open";
+  let requested=Math.max(1024,Number(richEl("speedTestChunkBytes")?.value||65536)),maxMsg=65536;
+  try{maxMsg=speedMaxMessageSize(pc)}catch(e){}
+  const maxPayload=maxMsg===Number.MAX_SAFE_INTEGER?requested:Math.max(1,maxMsg-SPEED_HEADER_BYTES);
+  const actual=plan?.actualPayloadBytes||Math.max(1,Math.min(requested,maxPayload));
+  const packet=(plan?.packetBytes)||(actual+SPEED_HEADER_BYTES),low=plan?.lowWater||Math.max(packet,Math.min(typeof BIN_LOW_WATER==="number"?BIN_LOW_WATER:16*1024*1024,packet*2)),high=plan?.highWater||Math.max(low+packet,Math.min(typeof BIN_HIGH_WATER==="number"?BIN_HIGH_WATER:128*1024*1024,Math.max(packet*8,1024*1024)));
+  const continuous=!!richEl("speedTestContinuous")?.checked,cap=!!richEl("speedTestCapTime")?.checked,maxSeconds=Math.max(1,Number(richEl("speedTestMaxSeconds")?.value||30)),mb=Math.max(1,Number(richEl("speedTestMB")?.value||32));
+  const rec=speedLastReceive,integrity=rec?("rx="+richFormatBytes(rec.received)+", chunks="+rec.chunks+", dup="+rec.duplicates+", err="+(rec.errorCount||0)):"pending run";
+  speedSetUi("speedUiConnection",connectedNow?"connected":"not connected");
+  speedSetUi("speedUiChannels","ctrl="+ctrlState+", bin="+binState);
+  speedSetUi("speedUiMaxMsg",speedMaxText(maxMsg));
+  speedSetUi("speedUiPayload",requested+" → "+actual+" B; packet "+packet+" B");
+  speedSetUi("speedUiWater",richFormatBytes(low)+" / "+richFormatBytes(high)+"; queue "+richFormatBytes(lane?.bufferedAmount||0));
+  speedSetUi("speedUiMode",(continuous?"continuous":"target "+mb+" MB")+(cap?", cap "+maxSeconds+"s":", no time cap"));
+  speedSetUi("speedUiIntegrity",integrity);
+  speedSetUi("speedUiLast",speedLastUiNote);
+  const d=richEl("speedUiDetails");if(d)d.textContent=(connectedNow?"Ready to test. ":"Connect first; speed test needs ctrl and bin open. ")+"Requested chunk is clamped to maxMessageSize minus 12-byte speed header. Receiver verifies deterministic payload in-place and reports app-level missing chunks, duplicates, and mismatches. Watermarks show low/high queued-byte pump thresholds.";
+}
+function speedClearReport(){const box=richEl("speedTestReport");if(box)box.textContent="";speedRefreshUi(null,"report cleared")}
+function speedReport(text){const box=richEl("speedTestReport");if(box){box.textContent+="["+new Date().toLocaleTimeString()+"] "+text+"\n";box.scrollTop=box.scrollHeight}speedRefreshUi(null,text);richLog("SPEED: "+text)}
+function speedSeedFromId(id){let h=2166136261;for(const ch of String(id)){h^=ch.charCodeAt(0);h=Math.imul(h,16777619)}return h>>>0}
+function speedPushError(rec,text){rec.errorCount=(rec.errorCount||0)+1;if(rec.errors.length<SPEED_ERROR_SAMPLE_MAX)rec.errors.push(text)}
+function speedPcForLane(lane){return (activeWebRTCConnections.find(c=>c.binChan===lane||c.ctrlChan===controlChannel())||{}).pc||pc}
+function speedSdpMaxMessageSize(desc){const m=String(desc?.sdp||"").match(/a=max-message-size:(\d+)/);return m?Number(m[1]):0}
+function speedMaxMessageSize(targetPc=pc){
+  const direct=Number(targetPc?.sctp?.maxMessageSize);
+  if(Number.isFinite(direct)){if(direct===0)return Number.MAX_SAFE_INTEGER;if(direct>0)return direct}
+  const remote=speedSdpMaxMessageSize(targetPc?.remoteDescription);
+  if(remote===0&&/a=max-message-size:0/.test(String(targetPc?.remoteDescription?.sdp||"")))return Number.MAX_SAFE_INTEGER;
+  if(remote>0)return remote;
+  return 65536;
+}
+function speedTuneWatermarks(plan){
+  plan.packetBytes=SPEED_HEADER_BYTES+plan.actualPayloadBytes;
+  plan.lowWater=Math.max(plan.packetBytes,Math.min(typeof BIN_LOW_WATER==="number"?BIN_LOW_WATER:16*1024*1024,plan.packetBytes*2));
+  plan.highWater=Math.max(plan.lowWater+plan.packetBytes,Math.min(typeof BIN_HIGH_WATER==="number"?BIN_HIGH_WATER:128*1024*1024,Math.max(plan.packetBytes*8,1024*1024)));
+}
+function speedMakePlan(lane){
+  const continuous=!!richEl("speedTestContinuous")?.checked;
+  const capTime=!!richEl("speedTestCapTime")?.checked;
+  const maxSeconds=Math.max(1,Number(richEl("speedTestMaxSeconds")?.value||30));
+  const mb=Math.max(1,Number(richEl("speedTestMB")?.value||32));
+  const requestedChunkBytes=Math.max(1024,Number(richEl("speedTestChunkBytes")?.value||65536));
+  const id=richMakeId("speed"),testKey=speedSeedFromId(id),maxMessageSize=speedMaxMessageSize(speedPcForLane(lane));
+  const maxPayload=maxMessageSize===Number.MAX_SAFE_INTEGER?requestedChunkBytes:Math.max(1,maxMessageSize-SPEED_HEADER_BYTES);
+  const actualPayloadBytes=Math.max(1,Math.min(requestedChunkBytes,maxPayload));
+  const plan={id,testKey,seed:testKey,requestedChunkBytes,actualPayloadBytes,maxMessageSize,continuous,capTime,maxSeconds,totalBytes:continuous?Number.MAX_SAFE_INTEGER:Math.round(mb*1024*1024),sent:0,index:0,start:0,deadline:Infinity,lastReport:0,done:false,armed:false,resumeTimer:null,readyTimeout:Math.max(3000,Math.min(30000,capTime?maxSeconds*1000:15000))};
+  speedTuneWatermarks(plan);speedLastPlan=plan;speedRefreshUi(plan,"plan ready");return plan;
+}
+function speedFillPayload(bytes,offset,seed,index,len){let x=(seed^Math.imul(index,2654435761))>>>0;for(let i=0;i<len;i++){x^=x<<13;x^=x>>>17;x^=x<<5;bytes[offset+i]=(x+i+index)&255}}
+function speedVerifyPayload(bytes,offset,len,seed,index){let x=(seed^Math.imul(index,2654435761))>>>0;for(let i=0;i<len;i++){x^=x<<13;x^=x>>>17;x^=x<<5;if(bytes[offset+i]!==((x+i+index)&255))return i}return -1}
+function speedBuildPacket(plan,len){const packet=new Uint8Array(SPEED_HEADER_BYTES+len),dv=new DataView(packet.buffer);dv.setUint32(0,SPEED_MAGIC);dv.setUint32(4,plan.testKey);dv.setUint32(8,plan.index);speedFillPayload(packet,SPEED_HEADER_BYTES,plan.seed,plan.index,len);return packet}
+const speedTextDecoder=new TextDecoder();
+function speedParsePacketHeader(bytes){
+  if(bytes.byteLength<SPEED_HEADER_BYTES)return null;
+  const dv=new DataView(bytes.buffer,bytes.byteOffset,bytes.byteLength);
+  if(dv.getUint32(0)!==SPEED_MAGIC)return null;
+  const idLen=dv.getUint16(4),oldHead=10+idLen;
+  if(idLen>0&&idLen<128&&bytes.byteLength>=oldHead){
+    try{const id=speedTextDecoder.decode(bytes.subarray(10,oldHead));if(/^speed/.test(id))return {id,testKey:speedSeedFromId(id),index:dv.getUint32(6),headLen:oldHead,legacy:true}}catch(e){}
+  }
+  return {id:null,testKey:dv.getUint32(4),index:dv.getUint32(8),headLen:SPEED_HEADER_BYTES,legacy:false};
+}
+function speedStorePendingPacket(key,index,bytes){
+  const copy=bytes.slice();
+  if(copy.byteLength>SPEED_PENDING_BINARY_MAX){speedReport("Speed pending packet too large to retain: "+richFormatBytes(copy.byteLength));return}
+  while(speedPendingBinaryBytes+copy.byteLength>SPEED_PENDING_BINARY_MAX&&speedPendingBinary.size){
+    const firstKey=speedPendingBinary.keys().next().value,list=speedPendingBinary.get(firstKey),old=list.shift();
+    speedPendingBinaryBytes-=old.bytes.byteLength;if(!list.length)speedPendingBinary.delete(firstKey);
+  }
+  const list=speedPendingBinary.get(key)||[];list.push({index,bytes:copy,time:performance.now()});speedPendingBinary.set(key,list);speedPendingBinaryBytes+=copy.byteLength;
+}
+function speedFlushPendingPackets(key){
+  const list=speedPendingBinary.get(key);if(!list||!list.length)return;
+  speedPendingBinary.delete(key);
+  for(const item of list){speedPendingBinaryBytes-=item.bytes.byteLength;speedTryConsumeBinary(item.bytes,true)}
+}
+function speedWaitForReady(id,timeout=15000){
+  return new Promise(resolve=>{
+    const timer=setTimeout(()=>{if(speedReadyWaiters.has(id)){speedReadyWaiters.delete(id);resolve({ok:false,reason:"receiver ready timeout"})}},timeout);
+    speedReadyWaiters.set(id,msg=>{clearTimeout(timer);resolve(msg)});
+  });
+}
+function speedHandleReady(msg){const cb=speedReadyWaiters.get(msg.id);if(!cb){speedReport("Late/unmatched speed ready for "+msg.id+": "+(msg.ok?"ok":"not ok"));return}speedReadyWaiters.delete(msg.id);cb(msg)}
+function speedStartReceive(msg){
+  const lane=ensureBinaryLane(),ok=!!(lane&&lane.readyState==="open"),id=String(msg.id||"speed"),testKey=Number.isFinite(Number(msg.testKey))?Number(msg.testKey)>>>0:speedSeedFromId(id);
+  if(!ok){speedReport("Rejecting deterministic test "+id+": no open binary lane at receiver.");try{sendCtrlMessage({type:"speedTestReady",id,ok:false,reason:"receiver has no open binary lane",time:Date.now()})}catch(e){}return}
+  const maxMessageSize=speedMaxMessageSize(speedPcForLane(lane));
+  const requested=Number(msg.actualPayloadBytes||msg.chunkBytes||65536);
+  const acceptedPayloadBytes=Math.max(1,Math.min(requested,maxMessageSize===Number.MAX_SAFE_INTEGER?requested:Math.max(1,maxMessageSize-SPEED_HEADER_BYTES)));
+  const rec={id,testKey,seed:testKey,size:Number(msg.size)||0,chunkBytes:acceptedPayloadBytes,start:performance.now(),received:0,chunks:0,highest:-1,errorCount:0,duplicates:0,errors:[],seen:new Set(),lastReport:0,finishTimer:null};
+  speedReceiveTests.set(id,rec);speedReceiveTests.set(testKey,rec);speedLastReceive=rec;speedRefreshUi(null,"receiver armed "+id);
+  speedReport("Receiving deterministic test "+id+" requested="+(msg.chunkBytes||0)+", actual="+acceptedPayloadBytes+", maxMsg="+(maxMessageSize===Number.MAX_SAFE_INTEGER?"memory":maxMessageSize)+"; binary lane verified.");
+  try{sendCtrlMessage({type:"speedTestReady",id,ok:true,testKey,acceptedPayloadBytes,maxMessageSize:maxMessageSize===Number.MAX_SAFE_INTEGER?0:maxMessageSize,binReadyState:lane.readyState,time:Date.now()})}catch(e){speedReport("Could not send speedTestReady: "+e.message)}
+  speedFlushPendingPackets(id);speedFlushPendingPackets(testKey);
+}
+function speedFinishReceive(msg,final=false){
+  const rec=speedReceiveTests.get(msg.id)||speedReceiveTests.get(Number(msg.testKey));
+  if(!rec){speedReport("Speed test end for unknown id "+(msg.id||msg.testKey));return}
+  if(!final&&!rec.finishTimer){rec.finishTimer=setTimeout(()=>speedFinishReceive(msg,true),250);speedReport("Speed end received for "+rec.id+"; allowing short grace for queued binary chunks.");return}
+  const elapsed=Math.max(1,performance.now()-rec.start),mbps=(rec.received*8/elapsed/1000).toFixed(2),expectedChunks=Number(msg.chunks)||rec.chunks,lost=Math.max(0,expectedChunks-rec.seen.size),errors=rec.errorCount||rec.errors.length;
+  speedReport("Finished deterministic test "+rec.id+": "+richFormatBytes(rec.received)+", chunks="+rec.seen.size+"/"+expectedChunks+", lost="+lost+", duplicates="+rec.duplicates+", errors="+errors+", ≈"+mbps+" Mbps"+(msg.hitTimeCap?", sender stopped by "+(msg.capSeconds||"?")+"s cap":"")+(msg.error?", sender error="+msg.error:"")+(rec.errors.length?", samples: "+rec.errors.slice(0,3).join(" | "):""));
+}
+function speedTryConsumeBinary(bytes,retryingPending=false){
+  const parsed=speedParsePacketHeader(bytes);if(!parsed)return false;
+  const rec=speedReceiveTests.get(parsed.id)||speedReceiveTests.get(parsed.testKey),key=parsed.id||parsed.testKey;
+  if(!rec){if(!retryingPending)speedStorePendingPacket(key,parsed.index,bytes);else speedReport("Pending speed packet still has no start metadata: "+key+" index="+parsed.index);return true}
+  const payloadLen=bytes.byteLength-parsed.headLen;
+  if(rec.seen.has(parsed.index)){rec.duplicates++;speedPushError(rec,"duplicate "+parsed.index);return true}
+  const bad=parsed.legacy?speedVerifyPayload(bytes,parsed.headLen,payloadLen,speedSeedFromId(parsed.id),parsed.index):speedVerifyPayload(bytes,parsed.headLen,payloadLen,rec.seed,parsed.index);
+  if(bad>=0)speedPushError(rec,"chunk "+parsed.index+" mismatch at byte "+bad);
+  rec.seen.add(parsed.index);rec.chunks++;rec.received+=payloadLen;if(parsed.index>rec.highest)rec.highest=parsed.index;speedLastReceive=rec;
+  const now=performance.now();if(now-rec.lastReport>500){rec.lastReport=now;speedReport("Speed receiving "+rec.id+": "+richFormatBytes(rec.received)+", chunks="+rec.chunks+", errors="+(rec.errorCount||0)+", duplicates="+rec.duplicates)}
+  return true;
+}
+function speedClassifyError(e){const name=e?.name||"Error",msg=e?.message||String(e);return name+": "+msg}
+function speedMaybeReport(plan,lane){const now=performance.now();if(now-plan.lastReport<500)return;plan.lastReport=now;const elapsed=Math.max(1,now-plan.start);speedReport("Speed sending "+plan.id+": "+richFormatBytes(plan.sent)+", chunks="+plan.index+", queued="+richFormatBytes(lane?.bufferedAmount||0)+", ≈"+(plan.sent*8/elapsed/1000).toFixed(2)+" Mbps")}
+function speedCanSend(plan){return !speedTestStop&&!plan.done&&plan.sent<plan.totalBytes&&performance.now()<plan.deadline}
+function speedArmResume(plan,lane){
+  if(plan.armed||plan.done)return;plan.armed=true;lane.bufferedAmountLowThreshold=plan.lowWater;
+  const resume=()=>{try{lane.removeEventListener("bufferedamountlow",resume)}catch(e){}clearTimeout(plan.resumeTimer);plan.armed=false;speedPump(plan)};
+  lane.addEventListener("bufferedamountlow",resume,{once:true});plan.resumeTimer=setTimeout(resume,lane.bufferedAmount>plan.highWater?8:0);
+}
+function speedFinishSend(plan,lane,error=""){
+  if(plan.done)return;plan.done=true;clearTimeout(plan.resumeTimer);speedSendPlans.delete(plan.testKey);
+  const now=performance.now(),hitTimeCap=plan.capTime&&!speedTestStop&&!error&&plan.sent<plan.totalBytes&&now>=plan.deadline;
+  try{sendCtrlMessage({type:"speedTestEnd",id:plan.id,testKey:plan.testKey,size:plan.sent,chunks:plan.index,time:Date.now(),hitTimeCap,capSeconds:plan.capTime?plan.maxSeconds:0,error})}catch(e){speedReport("Could not send speedTestEnd: "+e.message)}
+  const elapsed=Math.max(1,now-plan.start);
+  speedReport("Sent deterministic test "+plan.id+": "+richFormatBytes(plan.sent)+", chunks="+plan.index+", actualPayload="+plan.actualPayloadBytes+", queued="+richFormatBytes(lane?.bufferedAmount||0)+", ≈"+(plan.sent*8/elapsed/1000).toFixed(2)+" Mbps"+(hitTimeCap?", stopped by "+plan.maxSeconds+"s cap":"")+(error?", error="+error:""));
+}
+function speedPump(plan){
+  if(plan.done)return;const lane=ensureBinaryLane();
+  if(!lane||lane.readyState!=="open")return speedFinishSend(plan,lane,"binary channel closed");
+  try{
+    while(speedCanSend(plan)&&lane.bufferedAmount<plan.highWater){
+      const len=plan.continuous?plan.actualPayloadBytes:Math.min(plan.actualPayloadBytes,plan.totalBytes-plan.sent);
+      if(len<=0)break;
+      const packet=speedBuildPacket(plan,len);lane.send(packet.buffer);plan.sent+=len;plan.index++;speedMaybeReport(plan,lane);
+    }
+  }catch(e){return speedFinishSend(plan,lane,speedClassifyError(e))}
+  if(!speedCanSend(plan))return speedFinishSend(plan,lane,speedTestStop?"stopped":"");
+  speedArmResume(plan,lane);
+}
+async function startDeterministicSpeedTest(){
+  if(!connected()){speedReport("Cannot start: not connected.");return}
+  const ctrl=controlChannel();if(!ctrl){speedReport("Cannot start: control channel is not open.");return}
+  const initialLane=ensureBinaryLane();if(!initialLane){speedReport("Cannot start: binary channel is not open.");return}
+  speedTestStop=false;const plan=speedMakePlan(initialLane);speedSendPlans.set(plan.testKey,plan);
+  try{sendCtrlMessage({type:"speedTestStart",id:plan.id,testKey:plan.testKey,patternVersion:2,size:plan.continuous?0:plan.totalBytes,chunkBytes:plan.requestedChunkBytes,actualPayloadBytes:plan.actualPayloadBytes,packetBytes:plan.packetBytes,maxMessageSize:plan.maxMessageSize===Number.MAX_SAFE_INTEGER?0:plan.maxMessageSize,continuous:plan.continuous,capTime:plan.capTime,maxSeconds:plan.maxSeconds,time:Date.now(),requiresBinaryReady:true})}
+  catch(e){speedSendPlans.delete(plan.testKey);speedReport("Cannot start: failed to send speedTestStart: "+e.message);return}
+  speedReport("Waiting for receiver speedTestReady for "+plan.id+" before sending binary data. requested="+plan.requestedChunkBytes+", actual="+plan.actualPayloadBytes+", packet="+plan.packetBytes+", maxMsg="+(plan.maxMessageSize===Number.MAX_SAFE_INTEGER?"memory":plan.maxMessageSize));
+  const ready=await speedWaitForReady(plan.id,plan.readyTimeout);
+  if(!ready||!ready.ok){speedSendPlans.delete(plan.testKey);speedReport("Speed test aborted before data start: "+(ready?.reason||"receiver did not confirm ready"));return}
+  const accepted=Number(ready.acceptedPayloadBytes);if(Number.isFinite(accepted)&&accepted>0&&accepted<plan.actualPayloadBytes){plan.actualPayloadBytes=accepted;speedTuneWatermarks(plan);speedReport("Receiver lowered actual payload to "+accepted+" bytes; packet="+plan.packetBytes)}
+  plan.start=performance.now();plan.deadline=plan.capTime?plan.start+plan.maxSeconds*1000:Infinity;plan.lastReport=0;
+  speedReport("Started deterministic test "+plan.id+(plan.continuous?" continuous":" target="+richFormatBytes(plan.totalBytes))+" actualPayload="+plan.actualPayloadBytes+", low/high="+richFormatBytes(plan.lowWater)+"/"+richFormatBytes(plan.highWater)+(plan.capTime?", cap="+plan.maxSeconds+"s":", no time cap")+"; receiver ready confirmed.");
+  speedPump(plan);
+}
+function stopDeterministicSpeedTest(){
+  speedTestStop=true;
+  for(const [id,cb] of speedReadyWaiters){try{cb({id,ok:false,reason:"stopped before receiver ready"})}catch(e){}}
+  speedReadyWaiters.clear();
+  for(const plan of speedSendPlans.values())speedFinishSend(plan,ensureBinaryLane(),"stopped");
+  speedReport("Stop requested.")
+}/*🟡🔴*/
+async function handleRichMessage(msg){
+/*🟢*/  if(msg.type==="richBinaryFrameDiag"){
+    richLog("Peer binary-frame diagnostic: "+(msg.kind||"diag")+", size="+richFormatBytes(msg.size||0)+", defaultHeaderAt="+(msg.defaultHeaderAt??-1)+", pending="+(msg.pending?.count??"?")+"/"+richFormatBytes(msg.pending?.bytes||0)+(msg.sampleHex?", sample1024="+String(msg.sampleHex).slice(0,96)+"…":""));
+    return;
+  }/*🟡🔴*/
+  if(msg.type==="richPathHint"){
+    richLog("Peer path hint/no-list request: from="+(msg.fromPath||"<blank>")+" → to="+(msg.toPath||msg.subfolder||"<blank>"));
+    return;
+  }
+/*🟢*/  if(msg.type==="richFileStart"){await richStartIncomingFile(msg);if(msg.wireMode==="raw-bin-v8")sendCtrlMessage({type:"richFileReady",id:msg.id});return}/*🟡  if(msg.type==="richFileStart"){await richStartIncomingFile(msg);return}🔴*/
+  if(msg.type==="richFileChunk"){await richReceiveFileChunk(msg);return}
+/*🟢*/  if(msg.type==="richFileEnd"){const rec=richIncoming.get(msg.id);if(rec&&rec.meta?.wireMode==="raw-bin-v8"&&(rec.received<Number(msg.size)||rec.seenIndexes.size<Number(msg.chunks))){rec.endPending=msg;return}await richFinishIncomingFile(msg);return}/*🟡  if(msg.type==="richFileEnd"){await richFinishIncomingFile(msg);return}🔴*/
+  if(msg.type==="richSyncManifestRequest"){
+    richLog("Peer requested my sync manifest.");
+    if(richSyncItems.length)sendRichSyncManifest();
+
+
+/* ===== SURGICAL HUNK 33 | old L1186-L1193 | new L1881-L1921 ===== */
+  if(msg.type==="richRtcAnswer"){await richHandleRtcAnswer(msg);return}
+  richLog("Unknown rich message: "+msg.type);
+}
+/*🟢*/async function richApplyParsedBinaryPacket(rec,parsed,source="live"){
+  const {index,payload,magicHex}=parsed;
+  if(rec.seenIndexes.has(index))return true;
+  rec.seenIndexes.add(index);
+  rec.received+=payload.byteLength;
+  rec.chunkBytes[index]=payload.byteLength;
+  if(rec.writable)await rec.writable.write(payload);
+  else rec.parts.push(payload);
+  if(source!=="live"||magicHex!==richCleanHex(rec.meta?.frame?.magicHex||rec.meta?.binMagicHex||"56384231","56384231"))richLog("Accepted "+source+" binary packet for "+(rec.path||rec.meta?.id)+" using magic "+magicHex+".");
+  if((index%64)===0)renderRichReceiveList();
+  if(rec.endPending&&rec.received>=Number(rec.endPending.size)&&rec.seenIndexes.size>=Number(rec.endPending.chunks))await richFinishIncomingFile(rec.endPending);
+  return true;
+}
+async function richTryConsumeBinaryForRecord(bytes,rec,options={}){
+  let parsed=richParseRawPacketForRecord(bytes,rec);
+  if(parsed)return richApplyParsedBinaryPacket(rec,parsed,options.pendingId?"pending":"live");
+  if(options.allowDefaultFallback!==false){
+    parsed=richParseRawPacketForRecord(bytes,rec,"56384231");
+    if(parsed){
+      richSendFrameDiagnostic("default-header-fallback",{id:options.pendingId||"",arrivalTime:Date.now(),size:bytes.byteLength,sampleHex:richBytesToHexSample(bytes),defaultHeaderAt:0,reason:"default header parsed while metadata header did not"},{matchedId:rec.meta?.id||""});
+      return richApplyParsedBinaryPacket(rec,parsed,options.pendingId?"pending default-header fallback":"default-header fallback");
+    }
+  }
+  return false;
+}/*🟡🔴*/
+async function handleRichBinaryPayload(data){
+/*🟢*/  if(data instanceof Blob)data=await data.arrayBuffer();
+  if(data instanceof Uint8Array)data=data.buffer.slice(data.byteOffset,data.byteOffset+data.byteLength);
+  if(!(data instanceof ArrayBuffer))return;
+  const bytes=new Uint8Array(data);
+  if(speedTryConsumeBinary(bytes))return;
+  for(const rec of richIncoming.values()){
+    if(await richTryConsumeBinaryForRecord(bytes,rec,{allowDefaultFallback:true}))return;
+  }
+  richStorePendingBinary(bytes,"no matching richFileStart/frame metadata yet");/*🟡  richLog("Received binary payload outside JSON file protocol: "+(data.size||data.byteLength||0)+" bytes. Ignored.");🔴*/
+}
+
+function handleRichRemoteTrack(event){
+
+
+/* ===== SURGICAL HUNK 34 | old L1203-L1210 | new L1931-L1938 ===== */
+  richLog("Remote media track received: "+event.track.kind);
+}
+function richRequireRtcPeer(){
+/*🟢*/  if(!(pc instanceof RTCPeerConnection)||!connected()){
+    richLog("Voice/video/screen needs the normal WebRTC RTCPeerConnection. PeerJS fallback cannot carry renegotiated media here.");/*🟡  if(!pc||!connected()){
+    richLog("Voice/video/screen needs the normal WebRTC connection open first. PeerJS fallback channel cannot carry renegotiated media here.");🔴*/
+    return false;
+  }
+  return true;
+
+
+/* ===== SURGICAL HUNK 35 | old L1217-L1223 | new L1945-L1951 ===== */
+    const offer=await pc.createOffer();
+    await pc.setLocalDescription(offer);
+    await waitForIceGatheringComplete();
+/*🟢*/    sendCtrlMessage({type:"richRtcOffer",description:pc.localDescription,reason,time:Date.now()});/*🟡    channel.send(JSON.stringify({type:"richRtcOffer",description:pc.localDescription,reason,time:Date.now()}));🔴*/
+    richLog("Sent media renegotiation offer: "+reason);
+  }catch(err){richLog("Media renegotiation failed: "+err.message)}
+  finally{richMediaOfferBusy=false}
+
+
+/* ===== SURGICAL HUNK 36 | old L1229-L1235 | new L1957-L1963 ===== */
+    const answer=await pc.createAnswer();
+    await pc.setLocalDescription(answer);
+    await waitForIceGatheringComplete();
+/*🟢*/    sendCtrlMessage({type:"richRtcAnswer",description:pc.localDescription,reason:msg.reason,time:Date.now()});/*🟡    channel.send(JSON.stringify({type:"richRtcAnswer",description:pc.localDescription,reason:msg.reason,time:Date.now()}));🔴*/
+    richLog("Accepted media renegotiation offer: "+(msg.reason||"remote media"));
+  }catch(err){richLog("Applying media offer failed: "+err.message)}
+}
+
+
+/* ===== SURGICAL HUNK 37 | old L1445-L1458 | new L2173-L2186 ===== */
+function sendEvalResult(report){
+  if(!connected())return;
+  const payload=fitEvalReportForSend(report);
+/*🟢*/  sendCtrlMessage({type:"text",text:EVAL_RESULT_PREFIX+" "+payload,time:Date.now()});/*🟡  channel.send(JSON.stringify({type:"text",text:EVAL_RESULT_PREFIX+" "+payload,time:Date.now()}));🔴*/
+}
+
+function sendEvalFromBox(){
+  if(!connected()){log("Cannot send eval: not connected yet.");return}
+  const code=document.getElementById("evalCode").value;
+  const text=EVAL_PREFIX+" "+code;
+/*🟢*/  sendCtrlMessage({type:"text",text,time:Date.now()});/*🟡  channel.send(JSON.stringify({type:"text",text,time:Date.now()}));🔴*/
+  evalLog("SENT remote eval request, "+code.length+" chars");
+}
+
+
+
+/* ===== SURGICAL HUNK 38 | old L1483-L1499 | new L2211-L2252 ===== */
+function attachPopulateButton(targetId,label="🔗"){
+  const el=document.getElementById(targetId);
+  if(!el||el.dataset.populateButtonAttached)return;
+/*🟢*/  if(el.type&&!["text","search","url","email","tel","password",""].includes(el.type)&&el.tagName!=="TEXTAREA")return;
+
+  const shell=document.createElement("span");
+  shell.className="fieldShell";
+  shell.dataset.populateFor=targetId;
+  const style=getComputedStyle(el);
+  shell.style.flex=el.style.flex||style.flex;
+  shell.style.minWidth=el.style.minWidth||style.minWidth;
+  shell.style.width=el.style.width&&el.style.width!=="auto"?el.style.width:(el.tagName==="TEXTAREA"?"100%":"");
+  shell.style.margin=el.style.margin;
+  el.style.margin="0";
+  if(el.style.flex)el.style.flex="";
+  if(el.style.minWidth)el.style.minWidth="";
+  if(el.style.width&&el.style.width!=="100%")el.style.width="100%";
+
+  el.parentNode.insertBefore(shell,el);
+  shell.appendChild(el);
+/*🟡🔴*/
+  const btn=document.createElement("button");
+  btn.type="button";
+/*🟢*/  btn.className="fieldFileBtn";/*🟡  btn.className="fileBtn";🔴*/
+  btn.title="Load file text into "+targetId;
+  btn.textContent=label;
+/*🟢*/  btn.onclick=event=>{event.preventDefault();event.stopPropagation();beginPopulateFromFile(targetId)};
+  shell.appendChild(btn);
+
+  requestAnimationFrame(()=>{
+    const glyphs=[...String(btn.textContent||label)].length;
+    shell.style.setProperty("--fieldFilePad",Math.max(3.8,glyphs+2.8).toFixed(1)+"ch");
+  });/*🟡  btn.onclick=()=>beginPopulateFromFile(targetId);
+  el.insertAdjacentElement("afterend",btn);🔴*/
+  el.dataset.populateButtonAttached="1";
+}
+function attachMissingPopulateButtons(){
+/*🟢*/  const explicit=["localCode","remoteCode","relayUrl","signalCryptoKey","signalCryptoRounds","publicRoomSeed","publicRoomSalt","publicMethodSeconds","publicRetryMaxSeconds","socketUrl","socketRoomSeed","socketRoomSalt","customText","evalCode","richSendFilter","richSourcePathHint","richReceiverSubfolder","richReceiverName","richReceiverPathHint","richBackupRootHint"];
+  explicit.forEach(id=>attachPopulateButton(id));
+  document.querySelectorAll("textarea,input[type=text],input:not([type])").forEach(el=>attachPopulateButton(el.id));/*🟡  ["signalCryptoKey","signalCryptoRounds","publicMethodSeconds","publicRetryMaxSeconds","richSendFilter","richSourcePathHint","richReceiverSubfolder","richReceiverName","richReceiverPathHint","richBackupRootHint"].forEach(id=>attachPopulateButton(id));🔴*/
+}
+
+async function finishPopulateFromFile(input){
+
+
+/* ===== SURGICAL HUNK 39 | old L1676-L1683 | new L2429-L2442 ===== */
+let publicPeers=new Set();
+let publicMadeOffer=false;
+let publicOfferId="";
+/*🟢*/let publicOfferPeer=null;/*🟡🔴*/
+let publicOfferTimer=null;
+let publicConnectedMethod="";
+/*🟢*/let publicSignalCounter=0;
+let publicLastSignalAt=0;
+let publicLastObservedRtt=250;
+// v7h control state
+// publicRunToken/publicRunStartedAt/publicCurrentRoom/publicCurrentOffer are declared in top state block./*🟡🔴*/
+const PUBLIC_NOSTR_RELAYS=["wss://relay.damus.io","wss://nos.lol","wss://relay.primal.net","wss://nostr.mom"];
+const PUBLIC_MQTT_BROKERS=["wss://broker.emqx.io:8084/mqtt","wss://broker.hivemq.com:8884/mqtt"];
+const PUBLIC_PEERJS_CDN="https://unpkg.com/peerjs@1.5.5/dist/peerjs.min.js";
+
+
+/* ===== SURGICAL HUNK 40 | old L1766-L1777 | new L2525-L2543 ===== */
+function publicCleanupSession(){
+  if(publicOfferTimer)clearTimeout(publicOfferTimer);
+  publicOfferTimer=null;
+/*🟢*/  for(const session of activeRelays){
+    if(session.keepAfterConnect)continue;
+    try{session.close&&session.close()}catch(e){}
+  }
+  activeRelays=activeRelays.filter(s=>s.keepAfterConnect);
+  publicSession=activeRelays[0]||null;
+  publicCurrentRoom=publicSession?.room||"";/*🟡  if(publicSession&&publicSession.close){try{publicSession.close()}catch{}}
+  publicSession=null;🔴*/
+}
+function publicStopAutoConnect(){
+  publicAbort=true;
+  publicAutoRunning=false;
+/*🟢*/  publicRunToken++;
+  wakeUpLoop();/*🟡🔴*/
+  publicCleanupSession();
+  setPublicAutoButtons(false);
+  setPublicState("auto stopped");
+
+
+/* ===== SURGICAL HUNK 41 | old L1784-L1790 | new L2550-L2559 ===== */
+  publicPeers.clear();
+  publicMadeOffer=false;
+  publicOfferId="";
+/*🟢*/  publicOfferPeer=null;/*🟡🔴*/
+  publicConnectedMethod="";
+/*🟢*/  publicCurrentOffer=null;
+  publicOfferInProgress=false;/*🟡🔴*/
+  if(clearReport&&publicReportEl)publicReportEl.textContent="";
+}
+function publicActiveMethods(){return publicMethods.filter(x=>x.enabled).map(x=>x.id)}
+
+
+/* ===== SURGICAL HUNK 42 | old L1798-L2077 | new L2567-L2869 ===== */
+  return Math.min(capMs,700+round*650+Math.floor(Math.random()*600));
+}
+function publicToggleAutoConnect(){
+/*🟢*/  const sel=document.getElementById("autoConnectTarget");
+  if(sel&&sel.value!=="new"&&!publicAutoRunning){triggerSpeculativeReconnect(sel.value,true);return}/*🟡🔴*/
+  if(publicAutoRunning)publicStopAutoConnect();
+  else publicAutoConnect();
+}
+/*🟢*/
+async function publicObserveResponseWindow(label,windowMs=1000,reads=3){
+  const before=publicSignalCounter;
+  const started=Date.now();
+  const gap=Math.max(100,Math.floor(windowMs/Math.max(1,reads)));
+  for(let i=0;i<reads;i++){
+    if(connected()||publicSignalCounter>before)break;
+    publicReport(label+": observation read "+(i+1)+"/"+reads+" after "+(Date.now()-started)+"ms");
+    await raceSleepOrSignal(gap);
+  }
+  const delta=publicSignalCounter-before;
+  if(delta>0){publicLastObservedRtt=Math.max(100,Date.now()-started);publicReport(label+": observed "+delta+" public response event(s) in "+publicLastObservedRtt+"ms.")}
+  return delta;
+}
+async function publicAutoConnect(hiddenRoomOverride=null){/*🟡async function publicAutoConnect(){🔴*/
+  if(publicAutoRunning){publicStopAutoConnect();return}
+/*🟢*/  if(connected()){setPublicState("already connected");return}/*🟡  if(connected()){
+    setPublicState("already connected");
+    publicReport("Already connected; auto connect skipped.");
+    return;
+  }🔴*/
+  publicResetRun(true);
+  publicAutoRunning=true;
+  setPublicAutoButtons(true);
+/*🟢*/  activeRelays=[];
+  publicRunStartedAt=Date.now();
+  const currentRunToken=++publicRunToken;
+  publicCurrentOffer=null;
+  publicOfferInProgress=false;
+
+  const room=hiddenRoomOverride||await updatePublicRoomPreview();
+  publicCurrentRoom=room;
+  const methods=publicActiveMethods();
+  if(!methods.length){setPublicState("no enabled methods");publicAutoRunning=false;publicAbort=true;setPublicAutoButtons(false);return}
+
+  const cap=parseFloat(document.getElementById("publicRetryMaxSeconds")?.value||"5");
+  const userMaxWaitMs=Math.max(500,Math.min(30000,Math.round((Number.isFinite(cap)?cap:5)*1000)));
+  publicReport(hiddenRoomOverride?"Starting Private Reconnect Cascade...":"Starting Parallel Cascade Rendezvous...");
+
+  for(const method of methods){
+    if(!publicStillCurrent(currentRunToken)||connected())break;
+    setPublicState("firing "+PUBLIC_METHOD_DEFS[method].name);
+    publicReport("Firing "+PUBLIC_METHOD_DEFS[method].name+" in background...");
+    try{
+      if(method==="nostr")publicTryNostr(room,600000,currentRunToken).catch(e=>publicReport("Nostr failed: "+e.message));
+      else if(method==="mqtt")publicTryMqtt(room,600000,currentRunToken).catch(e=>publicReport("MQTT failed: "+e.message));
+      else if(method==="peerjs")publicTryPeerJs(room,600000,currentRunToken).catch(e=>publicReport("PeerJS failed: "+e.message));
+    }catch(err){publicReport("Failed to fire "+method+": "+err.message)}
+    await publicObserveResponseWindow("First-loop "+PUBLIC_METHOD_DEFS[method].name,1000,3);
+  }
+
+  let loopCount=0;
+  const baseWait=100;
+  while(publicStillCurrent(currentRunToken)&&!connected()){
+    loopCount++;
+    const waitMs=Math.min(baseWait*Math.pow(2,loopCount),userMaxWaitMs);
+    setPublicState("retrying in "+(waitMs/1000).toFixed(1)+"s");
+    publicReport(`Loop ${loopCount}: partial response-time loop; sleeping up to ${waitMs}ms, then doing 3 observation reads (max from UI).`);
+    await raceSleepOrSignal(waitMs);
+    await publicObserveResponseWindow("Retry loop "+loopCount,Math.min(waitMs,Math.max(100,publicLastObservedRtt*2)),3);
+    if(publicStillCurrent(currentRunToken)&&!connected()){
+      for(const session of activeRelays){
+        if(!session.keepAfterConnect&&session.alive&&!session.alive())try{session.close&&session.close()}catch(e){}
+      }
+      activeRelays=activeRelays.filter(r=>r.keepAfterConnect||!r.alive||r.alive());
+      publicSession=activeRelays[0]||null;
+      for(const method of methods){
+        if(!activeRelays.some(r=>r.methodId===method)){
+          publicReport("Relaunching dead method: "+PUBLIC_METHOD_DEFS[method].name);
+          try{
+            if(method==="nostr")publicTryNostr(room,600000,currentRunToken).catch(e=>publicReport("Nostr failed: "+e.message));
+            else if(method==="mqtt")publicTryMqtt(room,600000,currentRunToken).catch(e=>publicReport("MQTT failed: "+e.message));
+            else if(method==="peerjs")publicTryPeerJs(room,600000,currentRunToken).catch(e=>publicReport("PeerJS failed: "+e.message));
+          }catch(err){publicReport("Failed to refire "+method+": "+err.message)}/*🟡  let round=0;
+  const started=Date.now();
+  publicReport("Starting indefinite Auto Connect. It will keep trying enabled methods until connected or stopped.");
+  while(publicAutoRunning&&!publicAbort&&!connected()){
+    const room=await updatePublicRoomPreview();
+    const methods=publicActiveMethods();
+    if(!methods.length){setPublicState("no enabled methods");publicReport("No enabled rendezvous methods. Enable at least one method or stop auto.");break}
+    const methodWindow=publicMethodWindowMs();
+    round++;
+    setPublicState("auto round "+round+" | "+methods.join(" → "));
+    publicReport("Round "+round+" | room="+room+" | method window="+Math.round(methodWindow/1000)+"s | methods="+methods.map(id=>PUBLIC_METHOD_DEFS[id].name).join(" → "));
+    for(const method of methods){
+      if(publicAbort||!publicAutoRunning||connected())break;
+      publicResetRun(false);
+      setPublicState("trying "+PUBLIC_METHOD_DEFS[method].name+" | round "+round);
+      publicReport("Trying "+PUBLIC_METHOD_DEFS[method].name+" for up to "+Math.round(methodWindow/1000)+"s...");
+      try{
+        if(method==="nostr")await publicTryNostr(room,methodWindow);
+        else if(method==="mqtt")await publicTryMqtt(room,methodWindow);
+        else if(method==="peerjs")await publicTryPeerJs(room,methodWindow);
+        if(connected()){
+          publicConnectedMethod=method;
+          publicAutoRunning=false;
+          publicAbort=true;
+          setPublicAutoButtons(false);
+          setPublicState("connected via "+PUBLIC_METHOD_DEFS[method].name);
+          publicReport("Connected via "+PUBLIC_METHOD_DEFS[method].name+" after "+Math.round((Date.now()-started)/1000)+"s.");
+          return;
+        }
+        publicReport(PUBLIC_METHOD_DEFS[method].name+" ended without DataChannel open; continuing.");
+      }catch(err){
+        publicReport(PUBLIC_METHOD_DEFS[method].name+" failed: "+(err&&err.message?err.message:err));
+      }finally{
+        if(!connected()){
+          publicCleanupSession();
+          clearConnectionOnly();🔴*/
+        }
+      }
+/*🟢*/      publicSendSignal({kind:"hello",id:Math.random().toString(36).slice(2),data:{ua:navigator.userAgent.slice(0,90)}});
+      if(publicMadeOffer&&publicCurrentOffer)publicSendSignal({kind:"offer",id:publicOfferId,data:publicCurrentOffer});/*🟡🔴*/
+    }
+/*🟢*//*🟡    if(publicAbort||!publicAutoRunning||connected())break;
+    const pause=publicRetryPauseMs(round);
+    setPublicState("retrying in "+Math.round(pause/1000)+"s");
+    publicReport("No connection yet. Next round in "+Math.round(pause/1000)+"s. Stop auto to fall back manually.");
+    await sleep(pause);🔴*/
+  }
+/*🟢*/
+  if(connected()){
+    publicAutoRunning=false;
+    publicAbort=true;
+    publicCleanupSession();
+    setPublicAutoButtons(false);
+    setPublicState("connected via relay race");
+    publicReport("Connected! Dual channels established.");
+  }else{/*🟡  if(!connected()){🔴*/
+    publicAutoRunning=false;
+    setPublicAutoButtons(false);
+/*🟢*/    setPublicState(publicAbort?"auto stopped":"auto idle");/*🟡    if(publicAbort)setPublicState("auto stopped");
+    else setPublicState("auto idle");🔴*/
+  }
+}
+/*🟢*/function publicStillCurrent(token){return publicAutoRunning&&!publicAbort&&token===publicRunToken}
+async function publicSendSignal(msg){
+  let body;
+  try{body=await signalPackBody(msg)}catch(err){publicReport("Public signal encryption/send failed: "+err.message);return false}
+  let sent=false;
+  for(const session of activeRelays){
+    if(!session||!session.send)continue;
+    try{
+      const ok=session.send({app:"static-webrtc-v7",room:session.room,from:peerId,tabToken:myTabToken,ts:Date.now(),...body});
+      if(ok===true)sent=true;
+    }catch(e){}
+  }
+  if(!sent)publicReport("No active public session actually sent "+msg.kind);
+  return sent;/*🟡function publicSendSignal(msg){
+  if(!publicSession||!publicSession.send){publicReport("No active public session to send "+msg.kind);return false}
+  signalPackBody(msg).then(body=>publicSession.send({app:"static-webrtc-v7",room:publicSession.room,from:peerId,ts:Date.now(),...body})).catch(err=>publicReport("Public signal encryption/send failed: "+err.message));
+  return true;🔴*/
+}
+function schedulePublicMaybeOffer(reason){
+  if(publicOfferTimer)clearTimeout(publicOfferTimer);
+  publicOfferTimer=setTimeout(()=>publicMaybeStartOffer(reason),650+Math.floor(Math.random()*450));
+}
+async function publicMaybeStartOffer(reason){
+/*🟢*/  if(publicAbort||connected()||publicMadeOffer||publicOfferInProgress||activeRelays.length===0)return;
+  const peers=[...publicPeers].filter(id=>id&&id!==myTabToken).sort();
+  if(!peers.length){publicReport("No peer seen yet; waiting before offer.");return}
+  if(myTabToken.localeCompare(peers[0])>0){publicReport("Peer "+peers[0]+" has lower id; waiting to answer.");return}
+  publicReport("Starting offer via active relays after "+reason+".");/*🟡  if(publicAbort||connected()||publicMadeOffer||!publicSession)return;
+  const peers=[...publicPeers].filter(id=>id&&id!==peerId).sort();
+  if(!peers.length){
+    publicReport("No peer seen yet; waiting before offer.");
+    return;
+  }
+  if(peerId.localeCompare(peers[0])>0){
+    publicReport("Peer "+peers[0]+" has lower id; waiting to answer.");
+    return;
+  }
+  publicReport("Starting offer via "+publicSession.methodName+" after "+reason+".");🔴*/
+  await publicStartOfferNow();
+}
+async function publicStartOfferNow(){
+/*🟢*/  if(activeRelays.length===0){publicReport("No public session active.");return}
+  if(connected()||publicMadeOffer||publicOfferInProgress)return;
+  publicOfferInProgress=true;
+  try{
+    const localPc=makePeer();
+    const offer=await localPc.createOffer();
+    await localPc.setLocalDescription(offer);
+    await waitForIceGatheringComplete(localPc);
+    publicMadeOffer=true;
+    publicOfferPeer=localPc;
+    publicOfferId=Math.random().toString(36).slice(2);
+    publicCurrentOffer=localPc.localDescription;
+    await publicSendSignal({kind:"offer",id:publicOfferId,data:publicCurrentOffer});
+    publicReport("Auto-Offer sent via active relays: "+publicOfferId);
+  }finally{publicOfferInProgress=false}/*🟡  if(!publicSession){publicReport("No public session active.");return}
+  if(connected()){publicReport("Offer skipped: already connected.");return}
+  await makeHostCode();
+  let offer;
+  try{offer=decodeCode(localCodeEl.value)}
+  catch(err){publicReport("Could not decode generated offer: "+err.message);return}
+  publicMadeOffer=true;
+  publicOfferId=Math.random().toString(36).slice(2);
+  publicSendSignal({kind:"offer",id:publicOfferId,data:offer});
+  publicReport("Offer sent via "+publicSession.methodName+": "+publicOfferId+" | "+shortCodeInfo(localCodeEl.value));🔴*/
+}
+async function handlePublicSignal(msg){
+  if(!msg||msg.app!=="static-webrtc-v7")return;
+/*🟢*/  publicSignalCounter++;publicLastSignalAt=Date.now();
+  if(msg.room&&msg.room!==publicCurrentRoom&&!activeRelays.some(r=>r.room===msg.room))return;
+  if(msg.tabToken===myTabToken)return;
+  if(msg.ts&&publicRunStartedAt&&msg.ts<publicRunStartedAt-2000&&msg.from===peerId)return;/*🟡  if(publicSession&&msg.room!==publicSession.room)return;
+  if(msg.from===peerId)return;🔴*/
+  try{msg=await signalUnpackOuter(msg)}catch(err){publicReport(err.message);return}
+/*🟢*/  const senderId=msg.tabToken||msg.from;
+  if(msg.id&&publicSeenEvents.has(msg.kind+":"+msg.id+":"+senderId))return;
+  if(msg.id)publicSeenEvents.add(msg.kind+":"+msg.id+":"+senderId);
+  if(senderId)publicPeers.add(senderId);/*🟡  if(msg.id&&publicSeenEvents.has(msg.kind+":"+msg.id+":"+msg.from))return;
+  if(msg.id)publicSeenEvents.add(msg.kind+":"+msg.id+":"+msg.from);
+  if(msg.from)publicPeers.add(msg.from);🔴*/
+
+  if(msg.kind==="hello"){
+/*🟢*/    publicReport("Saw hello from "+(senderId||"peer")+".");
+    publicSendSignal({kind:"helloAck",to:senderId,id:Math.random().toString(36).slice(2),data:{ua:navigator.userAgent.slice(0,90)}});/*🟡    publicReport("Saw hello from "+msg.from+".");
+    publicSendSignal({kind:"helloAck",to:msg.from,id:Math.random().toString(36).slice(2),data:{ua:navigator.userAgent.slice(0,90)}});🔴*/
+    schedulePublicMaybeOffer("hello");
+    return;
+  }
+  if(msg.kind==="helloAck"){
+/*🟢*/    publicReport("Saw helloAck from "+(senderId||"peer")+".");/*🟡    publicReport("Saw helloAck from "+msg.from+".");🔴*/
+    schedulePublicMaybeOffer("helloAck");
+    return;
+  }
+  if(msg.kind==="offer"){
+/*🟢*/    if(connected())return;
+    wakeUpLoop();
+    publicReport("Offer received from "+(senderId||"peer")+". Spawning joiner connection.");
+    const localPc=makePeer();/*🟡    if(connected()){publicReport("Offer ignored: already connected.");return}
+    if(publicMadeOffer&&peerId.localeCompare(msg.from)<0){
+      publicReport("Offer collision: keeping my lower-id offer; ignoring "+msg.from+".");
+      return;
+    }
+    publicReport("Offer received from "+msg.from+". Answering.");
+    publicMadeOffer=false;
+    clearConnectionOnly();🔴*/
+    remoteCodeEl.value=encodeCode(msg.data);
+/*🟢*/    await localPc.setRemoteDescription(msg.data);
+    const answer=await localPc.createAnswer();
+    await localPc.setLocalDescription(answer);
+    await waitForIceGatheringComplete(localPc);
+    localCodeEl.value=encodeCode(localPc.localDescription);
+    await publicSendSignal({kind:"answer",to:senderId,replyTo:msg.id,id:Math.random().toString(36).slice(2),data:localPc.localDescription});
+    publicReport("Answer sent to "+senderId+". Racing channels.");/*🟡    await joinFromHostCode();
+    let answer;
+    try{answer=decodeCode(localCodeEl.value)}
+    catch(err){publicReport("Could not decode generated answer: "+err.message);return}
+    publicSendSignal({kind:"answer",to:msg.from,replyTo:msg.id,id:Math.random().toString(36).slice(2),data:answer});
+    publicReport("Answer sent to "+msg.from+".");🔴*/
+    return;
+  }
+  if(msg.kind==="answer"){
+/*🟢*/    if(msg.to&&msg.to!==peerId&&msg.to!==myTabToken)return;
+    if(msg.replyTo&&publicOfferId&&msg.replyTo!==publicOfferId)return;
+    if(connected())return;
+    wakeUpLoop();
+    publicReport("Answer received. Applying to Host connections.");/*🟡    if(msg.to&&msg.to!==peerId)return;
+    if(!publicMadeOffer){publicReport("Answer ignored: I did not make active offer.");return}
+    if(msg.replyTo&&publicOfferId&&msg.replyTo!==publicOfferId){publicReport("Answer ignored: replyTo mismatch.");return}
+    if(connected()){publicReport("Answer ignored: already connected.");return}
+    publicReport("Answer received from "+msg.from+". Applying.");🔴*/
+    remoteCodeEl.value=encodeCode(msg.data);
+/*🟢*/    for(const conn of activeWebRTCConnections){
+      if(conn.pc&&conn.pc.signalingState==="have-local-offer"){
+        try{await conn.pc.setRemoteDescription(msg.data);break}catch(e){}
+      }
+    }/*🟡    try{await finishHostConnection()}
+    catch(err){publicReport("Applying public answer failed: "+err.message)}🔴*/
+    return;
+  }
+}
+/*🟢*/async function publicTryNostr(room,methodWindowMs=25000,runToken=publicRunToken){/*🟡async function publicTryNostr(room,methodWindowMs=25000){🔴*/
+  const tools=await import(PUBLIC_NOSTR_CDN);
+/*🟢*/  const secret=crypto.getRandomValues(new Uint8Array(32));/*🟡  const secret=tools.generateSecretKey?tools.generateSecretKey():tools.generatePrivateKey();🔴*/
+  const roomTag="ct-room-"+(await sha256Hex("nostr:"+room)).slice(0,40);
+  const sockets=[];
+  let opened=0;
+/*🟢*/  const session={methodId:"nostr",methodName:"Nostr WSS",room,alive(){return sockets.some(ws=>ws.readyState===WebSocket.OPEN)},close(){for(const ws of sockets){try{ws.close()}catch(e){}}},send(payload){/*🟡  publicSession={method:"nostr",methodName:"Nostr WSS",room,close(){for(const ws of sockets){try{ws.close()}catch{}}},send(payload){🔴*/
+    const base={kind:20000,created_at:Math.floor(Date.now()/1000),tags:[["t",roomTag],["client","static-webrtc-v7"]],content:JSON.stringify(payload)};
+    const event=tools.finalizeEvent?tools.finalizeEvent(base,secret):tools.finishEvent({...base,pubkey:tools.getPublicKey(secret)},secret);
+/*🟢*/    let ok=false;
+    for(const ws of sockets)if(ws.readyState===WebSocket.OPEN){ws.send(JSON.stringify(["EVENT",event]));ok=true}
+    return ok;/*🟡    for(const ws of sockets)if(ws.readyState===WebSocket.OPEN)ws.send(JSON.stringify(["EVENT",event]));
+    return true;🔴*/
+  }};
+  await new Promise(resolve=>{
+    let settled=false;
+/*🟢*/    const done=()=>{if(settled)return;settled=true;resolve()};
+    setTimeout(done,Math.min(methodWindowMs,6000));/*🟡    const done=()=>{if(!settled){settled=true;resolve()}};
+    setTimeout(done,Math.min(7000,Math.max(3000,methodWindowMs)));🔴*/
+    for(const url of PUBLIC_NOSTR_RELAYS){
+      try{
+        const ws=new WebSocket(url);
+        sockets.push(ws);
+/*🟢*/        ws.onopen=()=>{opened++;ws.send(JSON.stringify(["REQ","sub_"+peerId,{kinds:[20000],"#t":[roomTag],since:Math.floor(Date.now()/1000)-20}]));if(opened>=1)done()};
+        ws.onmessage=event=>{if(!publicStillCurrent(runToken))return;try{const arr=JSON.parse(event.data);if(arr[0]==="EVENT"&&arr[2]&&arr[2].content){const msg=JSON.parse(arr[2].content);handlePublicSignal(msg.packet||msg)}}catch(e){}};/*🟡        ws.onopen=()=>{
+          opened++;
+          ws.send(JSON.stringify(["REQ","sub_"+peerId,{kinds:[20000],"#t":[roomTag],since:Math.floor(Date.now()/1000)-20}]));
+          if(opened>=1)done();
+        };
+        ws.onmessage=event=>{
+          try{
+            const arr=JSON.parse(event.data);
+            if(arr[0]==="EVENT"&&arr[2]&&arr[2].content){
+              const msg=JSON.parse(arr[2].content);
+              handlePublicSignal(msg);
+            }
+          }catch{}
+        };🔴*/
+        ws.onerror=()=>{};
+/*🟢*/      }catch(e){}/*🟡      }catch{}🔴*/
+    }
+  });
+/*🟢*/  if(opened<1){session.close();throw new Error("no Nostr relay opened")}
+  if(!publicStillCurrent(runToken)){session.close();return}
+  activeRelays.push(session);publicSession=activeRelays[0]||null;/*🟡  if(opened<1)throw new Error("no Nostr relay opened");🔴*/
+  publicReport("Nostr opened "+opened+" relay(s). Sending hello.");
+  publicSendSignal({kind:"hello",id:Math.random().toString(36).slice(2),data:{ua:navigator.userAgent.slice(0,90)}});
+/*🟢*//*🟡  await waitPublicConnectOrTimeout("Nostr WSS",methodWindowMs);🔴*/
+}
+/*🟢*/async function publicTryMqtt(room,methodWindowMs=25000,runToken=publicRunToken){/*🟡async function publicTryMqtt(room,methodWindowMs=25000){🔴*/
+  await loadScriptOnce(PUBLIC_MQTT_CDN,"mqtt");
+  const topic="ct/public_rendezvous/"+(await sha256Hex("mqtt:"+room)).slice(0,48);
+  const clients=[];
+  let opened=0;
+/*🟢*/  const session={methodId:"mqtt",methodName:"MQTT-over-WSS",room,alive(){return clients.some(c=>c.connected)},close(){for(const c of clients){try{c.end(true)}catch(e){}}},send(payload){
+    const text=JSON.stringify({app:"static-webrtc-v7",room,from:peerId,tabToken:myTabToken,ts:Date.now(),...payload});
+    let ok=false;
+    for(const c of clients)if(c.connected){c.publish(topic,text,{qos:0,retain:false});ok=true}
+    return ok;/*🟡  publicSession={method:"mqtt",methodName:"MQTT-over-WSS",room,close(){for(const c of clients){try{c.end(true)}catch{}}},send(payload){
+    const text=JSON.stringify({app:"static-webrtc-v7",room,from:peerId,ts:Date.now(),...payload});
+    for(const c of clients)if(c.connected)c.publish(topic,text,{qos:0,retain:false});
+    return true;🔴*/
+  }};
+  await new Promise(resolve=>{
+    let settled=false;
+/*🟢*/    const done=()=>{if(settled)return;settled=true;resolve()};
+    setTimeout(done,Math.min(methodWindowMs,7000));/*🟡    const done=()=>{if(!settled){settled=true;resolve()}};
+    setTimeout(done,Math.min(8000,Math.max(3000,methodWindowMs)));🔴*/
+    for(const url of PUBLIC_MQTT_BROKERS){
+      try{
+/*🟢*/        const c=mqtt.connect(url,{clientId:"ct_"+peerId+"_"+Math.random().toString(36).slice(2),clean:true,connectTimeout:5000,reconnectPeriod:0});/*🟡        const c=mqtt.connect(url,{clientId:"ct_"+peerId+"_"+Math.random().toString(36).slice(2),clean:true,connectTimeout:Math.min(8000,Math.max(3000,methodWindowMs)),reconnectPeriod:0});🔴*/
+        clients.push(c);
+/*🟢*/        c.on("connect",()=>{c.subscribe(topic,err=>{if(!err){opened++;if(opened>=1)done()}})});
+        c.on("message",(t,payload)=>{if(!publicStillCurrent(runToken))return;if(t!==topic)return;try{const msg=JSON.parse(String(payload));handlePublicSignal(msg.packet||msg)}catch(e){}});/*🟡        c.on("connect",()=>{
+          c.subscribe(topic,err=>{
+            if(!err){opened++;if(opened>=1)done()}
+          });
+        });
+        c.on("message",(t,payload)=>{
+          if(t!==topic)return;
+          try{handlePublicSignal(JSON.parse(String(payload)))}catch{}
+        });🔴*/
+        c.on("error",()=>{});
+/*🟢*/      }catch(e){}/*🟡      }catch{}🔴*/
+    }
+  });
+/*🟢*/  if(opened<1){session.close();throw new Error("no MQTT broker subscribed")}
+  if(!publicStillCurrent(runToken)){session.close();return}
+  activeRelays.push(session);publicSession=activeRelays[0]||null;/*🟡  if(opened<1)throw new Error("no MQTT broker subscribed");🔴*/
+  publicReport("MQTT subscribed on "+opened+" broker(s). Sending hello.");
+  publicSendSignal({kind:"hello",id:Math.random().toString(36).slice(2),data:{ua:navigator.userAgent.slice(0,90)}});
+/*🟢*//*🟡  await waitPublicConnectOrTimeout("MQTT-over-WSS",methodWindowMs);🔴*/
+}
+function bindPeerJsConnection(conn,peer){
+/*🟢*/  const session=activeRelays.find(r=>r.methodId==="peerjs"&&r.peer===peer);
+  if(session)session.keepAfterConnect=true;
+  const fakeChan={readyState:"open",peerJsFallback:true,bufferedAmount:0,send(data){conn.send(data)},close(){try{conn.close()}catch(e){};try{peer.destroy()}catch(e){};this.readyState="closed";if(this.onclose)this.onclose()},onopen:null,onclose:null,onerror:null,onmessage:null};
+  conn.on("data",data=>{if(data instanceof ArrayBuffer||data instanceof Uint8Array||data instanceof Blob)handleRichBinaryPayload(data);else handleChannelMessage(typeof data==="string"?data:JSON.stringify(data))});
+  conn.on("close",()=>{if(ctrlChan===fakeChan){fakeChan.readyState="closed";setStatus("Disconnected");log("PeerJS DataConnection closed.")}});/*🟡  channel={
+    readyState:"open",
+    peerJsFallback:true,
+    bufferedAmount:0,
+    send(data){conn.send(data)},
+    close(){try{conn.close()}catch{};try{peer.destroy()}catch{};this.readyState="closed";if(this.onclose)this.onclose()},
+    onopen:null,onclose:null,onerror:null,onmessage:null
+  };
+  conn.on("data",data=>handleChannelMessage(typeof data==="string"?data:JSON.stringify(data)));
+  conn.on("close",()=>{if(channel){channel.readyState="closed";setStatus("Disconnected");log("PeerJS DataConnection closed.")}});🔴*/
+  conn.on("error",err=>{log("PeerJS DataConnection error: "+(err&&err.message?err.message:err))});
+/*🟢*//*🟡  setStatus("CONNECTED — PeerJS DataConnection open",true);🔴*/
+  log("PeerJS DataConnection bound as app channel.");
+/*🟢*/  promoteToGlobal(peer,fakeChan,fakeChan,[]);/*🟡  collapseSetupSectionsAfterConnect();🔴*/
+}
+/*🟢*/async function publicTryPeerJs(room,methodWindowMs=25000,runToken=publicRunToken){/*🟡async function publicTryPeerJs(room,methodWindowMs=25000){🔴*/
+  await loadScriptOnce(PUBLIC_PEERJS_CDN,"Peer");
+/*🟢*/  const base=(await sha256Hex("peerjs:"+room)).slice(0,18);
+  const hostId="ct_"+base;
+  const joinId="ct_"+base+"_"+peerId;
+  let peer=null,role="host";/*🟡  const hash=(await sha256Hex("peerjs:"+room)).slice(0,32);
+  const hostId="ct_"+hash+"_a";
+  const joinId="ct_"+hash+"_b_"+peerId;
+  setPublicState("PeerJS opening...");
+  let peer,role="host";🔴*/
+  try{
+/*🟢*/    publicReport("PeerJS trying host id: "+hostId);
+    peer=await openPeerJsId(hostId,Math.min(9000,methodWindowMs));/*🟡    peer=await openPeerJsId(hostId,Math.min(15000,methodWindowMs));
+    role="host";
+    publicReport("PeerJS opened as host id "+hostId+".");🔴*/
+  }catch(err){
+    role="joiner";
+    publicReport("PeerJS host id unavailable; joining host.");
+    peer=await openPeerJsId(joinId,Math.min(15000,methodWindowMs));
+  }
+/*🟢*/  const session={methodId:"peerjs",methodName:"PeerJS Cloud",room,peer,alive(){return !peer?.disconnected&&!peer?.destroyed},close(){try{peer&&peer.destroy()}catch(e){}},send(){return false}};
+  if(!publicStillCurrent(runToken)){session.close();return}
+  activeRelays.push(session);publicSession=activeRelays[0]||null;/*🟡  publicSession={method:"peerjs",methodName:"PeerJS Cloud",room,close(){try{peer&&peer.destroy()}catch{}},send(){return false}};🔴*/
+  if(role==="host"){
+/*🟢*/    try{
+      const conn=await new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(new Error("PeerJS host waited but no joiner connected")),methodWindowMs);peer.on("connection",c=>{clearTimeout(timer);resolve(c)});peer.on("error",err=>{clearTimeout(timer);reject(err)})});
+      if(!publicStillCurrent(runToken)){activeRelays=activeRelays.filter(r=>r!==session);publicSession=activeRelays[0]||null;try{conn.close()}catch(e){};try{session.close()}catch(e){};return}
+      await waitPeerJsConnOpen(conn,Math.min(15000,methodWindowMs));
+      bindPeerJsConnection(conn,peer);
+    }catch(err){activeRelays=activeRelays.filter(r=>r!==session);publicSession=activeRelays[0]||null;try{session.close()}catch(e){};throw err}/*🟡    const conn=await new Promise((resolve,reject)=>{
+      const timer=setTimeout(()=>reject(new Error("PeerJS host waited but no joiner connected")),methodWindowMs);
+      peer.on("connection",c=>{clearTimeout(timer);resolve(c)});
+      peer.on("error",err=>{clearTimeout(timer);reject(err)});
+    });
+    await waitPeerJsConnOpen(conn,Math.min(15000,methodWindowMs));
+    bindPeerJsConnection(conn,peer);🔴*/
+  }else{
+/*🟢*/    try{
+      const conn=peer.connect(hostId,{reliable:true,serialization:"json",metadata:{room,from:peerId,tabToken:myTabToken}});
+      if(!publicStillCurrent(runToken)){activeRelays=activeRelays.filter(r=>r!==session);publicSession=activeRelays[0]||null;try{conn.close()}catch(e){};try{session.close()}catch(e){};return}
+      await waitPeerJsConnOpen(conn,methodWindowMs);
+      bindPeerJsConnection(conn,peer);
+    }catch(err){activeRelays=activeRelays.filter(r=>r!==session);publicSession=activeRelays[0]||null;try{session.close()}catch(e){};throw err}/*🟡    const conn=peer.connect(hostId,{reliable:true,serialization:"json",metadata:{room,from:peerId}});
+    await waitPeerJsConnOpen(conn,methodWindowMs);
+    bindPeerJsConnection(conn,peer);🔴*/
+  }
+}
+function openPeerJsId(id,ms){
+
+
+/* ===== SURGICAL HUNK 43 | old L2156-L2162 | new L2948-L2954 ===== */
+
+function socketSend(msg){
+  if(!socketReady()){log("Socket send skipped: socket not open.");return false}
+/*🟢*/  signalPackBody(msg).then(body=>socket&&socket.readyState===WebSocket.OPEN&&socket.send(JSON.stringify({room:socketRoom,from:peerId,tabToken:myTabToken,ts:Date.now(),...body}))).catch(err=>log("Socket signal encryption/send failed: "+err.message));/*🟡  signalPackBody(msg).then(body=>socket&&socket.readyState===WebSocket.OPEN&&socket.send(JSON.stringify({room:socketRoom,from:peerId,ts:Date.now(),...body}))).catch(err=>log("Socket signal encryption/send failed: "+err.message));🔴*/
+  return true;
+}
+
+
+
+/* ===== SURGICAL HUNK 44 | old L2221-L2228 | new L3013-L3020 ===== */
+async function socketMaybeStartOffer(reason){
+  if(!document.getElementById("socketAutoStart").checked)return;
+  if(!socketReady()||connected()||socketMadeOffer)return;
+/*🟢*/  const peers=[...socketSawPeerIds].filter(id=>id&&id!==myTabToken).sort();
+  if(peers.length&&myTabToken.localeCompare(peers[0])>0){/*🟡  const peers=[...socketSawPeerIds].filter(id=>id&&id!==peerId).sort();
+  if(peers.length&&peerId.localeCompare(peers[0])>0){🔴*/
+    log("Socket auto: peer "+peers[0]+" has lower id, waiting to answer.");
+    return;
+  }
+
+
+/* ===== SURGICAL HUNK 45 | old L2247-L2255 | new L3039-L3048 ===== */
+  let msg;
+  try{msg=JSON.parse(raw)}catch{log("Socket raw non-JSON: "+String(raw).slice(0,200));return}
+  if(msg.room&&msg.room!==socketRoom)return;
+/*🟢*/  if(msg.tabToken===myTabToken)return;/*🟡  if(msg.from===peerId)return;🔴*/
+  try{msg=await signalUnpackOuter(msg)}catch(err){log("Socket "+err.message);return}
+/*🟢*/  const senderId=msg.tabToken||msg.from;
+  if(senderId)socketSawPeerIds.add(senderId);/*🟡  if(msg.from)socketSawPeerIds.add(msg.from);🔴*/
+
+  if(msg.kind==="joined"){
+    log("Socket relay joined room.");
+
+
+/* ===== SURGICAL HUNK 46 | old L2271-L2278 | new L3064-L3072 ===== */
+
+  if(msg.kind==="offer"&&msg.data&&msg.data.type==="offer"){
+    if(connected()){log("Socket offer ignored: already connected.");return}
+/*🟢*/    const senderId=msg.tabToken||msg.from;
+    if(socketMadeOffer&&myTabToken.localeCompare(senderId)<0){
+      log("Socket offer collision: keeping my lower-id offer, ignoring "+senderId+".");/*🟡    if(socketMadeOffer&&peerId.localeCompare(msg.from)<0){
+      log("Socket offer collision: keeping my lower-id offer, ignoring "+msg.from+".");🔴*/
+      return;
+    }
+    log("Socket offer received from "+msg.from+". Answering.");
+
+
+/* ===== SURGICAL HUNK 47 | old L2289-L2295 | new L3083-L3089 ===== */
+  }
+
+  if(msg.kind==="answer"&&msg.data&&msg.data.type==="answer"){
+/*🟢*/    if(msg.to&&msg.to!==peerId&&msg.to!==myTabToken)return;/*🟡    if(msg.to&&msg.to!==peerId)return;🔴*/
+    if(!socketMadeOffer){log("Socket answer ignored: I did not make active offer.");return}
+    if(msg.replyTo&&socketOfferId&&msg.replyTo!==socketOfferId){log("Socket answer ignored: replyTo mismatch.");return}
+    if(connected()){log("Socket answer ignored: already connected.");return}
+
+
+/* ===== SURGICAL HUNK 48 | old L2320-L2325 | new L3114-L3120 ===== */
+const relayOutbox=[];
+const relayAnsweredOfferIds=new Set();
+const relayAppliedAnswerIds=new Set();
+/*🟢*/let relayRunStartedAt=0;/*🟡🔴*/
+const RELAY_MESSAGE_TTL_MS=2*60*1000;
+function relayFreshMessages(messages){
+  const now=Date.now();
+
+
+/* ===== SURGICAL HUNK 49 | old L2520-L2526 | new L3315-L3321 ===== */
+}
+
+function relayQueue(kind,data,to="*",replyTo=null){
+/*🟢*/  const msg={id:Math.random().toString(36).slice(2),from:peerId,tabToken:myTabToken,to,kind,data,replyTo,ts:Date.now()};/*🟡  const msg={id:Math.random().toString(36).slice(2),from:peerId,to,kind,data,replyTo,ts:Date.now()};🔴*/
+  relayOutbox.push(msg);
+  relaySeen.add(msg.id);
+  log("Relay queued "+kind+".");
+
+
+/* ===== SURGICAL HUNK 50 | old L2549-L2555 | new L3344-L3350 ===== */
+function chooseCanonicalOffer(messages){
+  const offers=messages
+    .filter(m=>m.kind==="offer"&&m.data&&m.data.type==="offer")
+/*🟢*/    .sort((a,b)=>String(a.tabToken||a.from).localeCompare(String(b.tabToken||b.from))||a.ts-b.ts);/*🟡    .sort((a,b)=>String(a.from).localeCompare(String(b.from))||a.ts-b.ts);🔴*/
+  return offers[0]||null;
+}
+
+
+
+/* ===== SURGICAL HUNK 51 | old L2573-L2579 | new L3368-L3376 ===== */
+    return;
+  }
+
+/*🟢*/  const isOwnOffer=canonicalOffer.tabToken?canonicalOffer.tabToken===myTabToken:canonicalOffer.from===peerId;
+  const isStaleOwnOffer=canonicalOffer.from===peerId&&canonicalOffer.tabToken&&canonicalOffer.tabToken!==myTabToken&&canonicalOffer.ts&&relayRunStartedAt&&canonicalOffer.ts<relayRunStartedAt-2000;
+  if(!isOwnOffer&&!isStaleOwnOffer){/*🟡  if(canonicalOffer.from!==peerId){🔴*/
+    if(connected())return;
+    if(relayAnsweredOfferIds.has(canonicalOffer.id))return;
+
+
+
+/* ===== SURGICAL HUNK 52 | old L2588-L2599 | new L3385-L3396 ===== */
+    try{answer=decodeCode(localCodeEl.value)}
+    catch(err){log("Could not decode my answer: "+err.message);return}
+
+/*🟢*/    relayQueue("answer",answer,canonicalOffer.tabToken||canonicalOffer.from,canonicalOffer.id);/*🟡    relayQueue("answer",answer,canonicalOffer.from,canonicalOffer.id);🔴*/
+    return;
+  }
+
+  const answers=messages
+/*🟢*/    .filter(m=>m.kind==="answer"&&(m.to===peerId||m.to===myTabToken)&&m.replyTo===canonicalOffer.id&&m.data&&m.data.type==="answer")/*🟡    .filter(m=>m.kind==="answer"&&m.to===peerId&&m.replyTo===canonicalOffer.id&&m.data&&m.data.type==="answer")🔴*/
+    .sort((a,b)=>a.ts-b.ts);
+
+  for(const answer of answers){
+
+
+/* ===== SURGICAL HUNK 53 | old L2640-L2645 | new L3437-L3443 ===== */
+function setRelayEnabled(on){
+  if(on){
+    if(relayTimer)clearInterval(relayTimer);
+/*🟢*/    relayRunStartedAt=Date.now();/*🟡🔴*/
+    setRelayState("relay on");
+    log("Relay auto ON. Peer id: "+peerId+". Link: "+relayUrl());
+    relayTimer=setInterval(relayCheckOnce,1000);
