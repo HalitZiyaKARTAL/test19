@@ -2,3 +2,4 @@ https://github.com/HalitZiyaKARTAL/test19/actions/runs/28605294614/job/848239376
 https://github.com/HalitZiyaKARTAL/test19/actions/runs/28606748164/job/84828843199
 https://github.com/HalitZiyaKARTAL/test19/actions/runs/28606748164/job/84828940770
 https://github.com/HalitZiyaKARTAL/test19/actions/runs/28607662784/job/84832047168
+https://github.com/HalitZiyaKARTAL/test19/actions/runs/28647422240/job/84957307385
