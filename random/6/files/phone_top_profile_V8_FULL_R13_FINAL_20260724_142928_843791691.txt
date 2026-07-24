@@ -1,0 +1,3329 @@
+
+# Paste or source this file to install the function and print its generated help.
+# Execute it with options to collect.  Policy, storage, hashing, and scheduling
+# stay in this Termux-side subshell; the adb side runs bounded read-only recipes.
+phone_top_profile_v8() (
+  set +e
+  set +u
+  set +x
+  set +E
+  set +T
+  set +o pipefail
+  trap - ERR DEBUG RETURN
+  export LC_ALL=C
+  IFS=$' \t\n'
+  shopt -u varredir_close 2>/dev/null
+  umask 077
+
+  readonly ALLOW0='(^|[.:])(com\.chrome\.dev|com\.android\.chrome|com\.termux)($|[.:])'
+  readonly TOP_FIELDS='PID,UID,USER:32,PR,NI,VIRT,RES,SHR,S,%CPU,%MEM,TIME+,ARGS:256'
+
+  # aliases | variable | default | parser | help
+  # This is the sole option, default, help, parse-dispatch, and CONFIG factory.
+  readonly -a OPT=(
+    '--every-top|-|-|set_every_top|select every native report'
+    '--every|every|1|positive|select every Nth ordinary report'
+    '--period|period|0|time|ordinary report spacing'
+    '--rows|rows|80|positive|top row count'
+    '--delay|delay|native|delay|explicit top delay'
+    '--frame-cap|frame_cap|256K|size|retained raw top bytes'
+    '--top-arg|top_extra|list|safe_top_token|repeat one layout-compatible top token'
+    '--dir|out_dir|@downloads|writable_dir|output directory'
+    '--prefix|prefix|phone_top|safe_prefix|filename prefix'
+    '--low|low|10|late_threshold|low trigger percent'
+    '--high|high|90|late_threshold|high trigger percent'
+    '--probe-refresh|refresh|hourly|hour_day_off|mandatory probe epoch'
+    '--observer-budget|budget|30|percent0|optional probe duty percent'
+    '--batch-cap|batch_cap|6|one_to_32|targets per worker'
+    '--diag-timeout|diag_to|20|time_min2|recipe timeout'
+    '--context,--core-only|context|1|paired_bool|rich context toggle'
+    '--context-ttl|context_ttl|60|time_min5|ACTIVE freshness'
+    '--logcat|logcat|0|true|bounded marked logcat'
+    '--surveillance,--no-surveillance|watch|1|paired_bool|background optional repeats'
+    '--allow-regex|allow|@allow0|regex|optional-repeat exemption'
+    '--packages,--no-packages|packages|1|paired_bool|all-user package inventory'
+    '--delta-match|match|80|percent|heavy-state delta threshold'
+    '--encoding|encoding|plain|plain_compact|payload encoding'
+    '--seen-cap|seen_cap|8192|positive|hourly exact-map admission'
+    '--previous-cap|prev_cap|64MB|size|private previous bytes'
+    '--data-saver|saver|mid|saver|optional observer caps'
+    '--hour-cap|hour_cap|unset|size_or_inf|saver hourly override'
+    '--day-cap|day_cap|unset|size_or_inf|saver daily override'
+    '--total-cap|total_cap|unset|size_or_inf|saver invocation override'
+    '--checkpoint|checkpoint|300|time_min10|repetition and status flush'
+    '--duration|duration|0|time|elapsed invocation stop'
+    '--until|until|0|unsigned|wall-clock stop epoch'
+    '--max-reports|max_reports|0|unsigned|selected-report stop'
+    '--max-bytes|max_bytes|0|size0_inf|physical invocation stop'
+    '--source-timeout|source_to|60|time_min5|source silence timeout'
+    '--adb|adb|adb|command_path|adb executable'
+    '--serial|serial|empty|serial|adb target'
+    '--require-uid|shell_uid|2000|uid_or_any|least-privilege guard'
+    '-h,--help|help|0|true|show this generated help'
+  )
+
+  # scope | depth | component | cap | gate | typed recipe | operand
+  # The worker script builder below consumes this single closed recipe factory.
+  readonly -a CAPTURE=(
+    'proc|1|STATUS|65536|always|proc_file|status'
+    'proc|1|SCHEDSTAT|65536|always|proc_file|schedstat'
+    'proc|1|CGROUP|65536|always|proc_file|cgroup'
+    'proc|1|IO|65536|always|proc_file|io'
+    'proc|1|THREADS|262144|always|ps_threads|-'
+    'pkg|1|PACKAGE|524288|packages|dumpsys_package|-'
+    'pkg|1|APPOPS|196608|packages|appops|-'
+    'pkg|1|JOBS|262144|packages|pkg_projection|jobscheduler'
+    'pkg|1|SERVICES|196608|packages|dumpsys_pkg|activity_services'
+    'pkg|1|PROVIDERS|196608|packages|pkg_projection|activity_providers'
+    'pkg|1|ALARMS|196608|packages|local_window|alarm'
+    'pkg|1|NOTIFY|196608|packages|local_window|notification'
+    'pkg|1|BATSTATS|262144|packages|dumpsys_pkg|batterystats'
+    'deep|2|SMAPS|393216|always|proc_file|smaps_rollup'
+    'deep|2|LIMITS|131072|always|proc_file|limits'
+    'deep|2|WCHAN|65536|always|proc_file|wchan'
+    'deep|2|OOM|65536|always|proc_file|oom_score'
+    'deep|2|OOM_ADJ|65536|always|proc_file|oom_score_adj'
+    'deep|2|MEMINFO|524288|always|dumpsys_pid|meminfo'
+    'deep|2|CPUINFO|196608|always|local_window_pid|cpuinfo'
+    'deep|2|SYS_MEMINFO|196608|always|fixed_file|/proc/meminfo'
+    'ctx|0|BATTERY|65536|context|dumpsys_fixed|battery'
+    'ctx|0|POWER_SUPPLY|131072|context|power_supply|-'
+    'ctx|0|THERMAL|196608|context|dumpsys_fixed|thermalservice'
+    'ctx|0|POWER|196608|context|projection|power'
+    'ctx|0|DISPLAY|131072|context|projection|display'
+    'ctx|0|ACTIVITIES|196608|context|projection|activities'
+    'ctx|0|WINDOW|65536|context|projection|window'
+    'ctx|0|TELECOM|131072|context|projection|telecom'
+    'ctx|0|AUDIO|131072|context|projection|audio'
+    'ctx|0|PSI|65536|context|pressure|-'
+    'ctx|0|NETWORK|196608|context|projection|network'
+    'ctx|0|LOGCAT|524288|logcat|logcat|-'
+  )
+
+  reply=
+  dec() {
+    local x=${1-}
+    [[ $x =~ ^[0-9]{1,18}$ ]] || return 1
+    reply=$((10#$x))
+  }
+  positive() {
+    dec "${1-}" || return 1
+    ((reply > 0))
+  }
+  parse_time() {
+    local x=${1-} n mult=1
+    case $x in
+      *[sS]) n=${x%?} ;;
+      *[mM]) n=${x%?}; mult=60 ;;
+      *[hH]) n=${x%?}; mult=3600 ;;
+      *[dD]) n=${x%?}; mult=86400 ;;
+      *) n=$x ;;
+    esac
+    dec "$n" || return 1
+    ((reply <= 9223372036854775807 / mult)) || return 1
+    reply=$((reply * mult))
+  }
+  parse_size() {
+    local x=${1-} n suffix mult=1
+    x=${x,,}
+    case $x in
+      -1|inf|infinite|unlimited) reply=-1; return 0 ;;
+    esac
+    [[ $x =~ ^([0-9]+)(b|k|kb|m|mb|g|gb)?$ ]] || return 1
+    n=${BASH_REMATCH[1]}
+    suffix=${BASH_REMATCH[2]}
+    case $suffix in
+      k|kb) mult=1000 ;;
+      m|mb) mult=1000000 ;;
+      g|gb) mult=1000000000 ;;
+    esac
+    dec "$n" || return 1
+    ((reply <= 9223372036854775807 / mult)) || return 1
+    reply=$((reply * mult))
+  }
+  parse_pct100() {
+    local x=${1%\%} whole frac
+    [[ $x =~ ^([0-9]+)([.]([0-9]{1,2}))?$ ]] || return 1
+    dec "${BASH_REMATCH[1]}" || return 1
+    whole=$reply
+    ((whole <= (9223372036854775807 - 99) / 100)) || return 1
+    frac=${BASH_REMATCH[3]}
+    case ${#frac} in
+      0) frac=00 ;;
+      1) frac=${frac}0 ;;
+    esac
+    reply=$((whole * 100 + 10#$frac))
+  }
+  valid_pkg() {
+    [[ ${1-} =~ ^[A-Za-z0-9_]+([.][A-Za-z0-9_]+)+$ ]]
+  }
+  valid_operand() {
+    [[ ${1-} =~ ^[A-Za-z0-9_.:/@+\[\]-]{1,192}$ ]]
+  }
+  esc() {
+    reply=${1//\\/\\\\}
+    reply=${reply//$'\t'/\\t}
+    reply=${reply//$'\r'/\\r}
+    reply=${reply//$'\n'/\\n}
+  }
+  lenpart() {
+    reply="${#1}:$1"
+  }
+  join4() {
+    local a b c d x
+    lenpart "$1"; a=$reply
+    lenpart "$2"; b=$reply
+    lenpart "$3"; c=$reply
+    lenpart "$4"; d=$reply
+    reply=$a$b$c$d
+  }
+  clock_snapshot() {
+    date '+%s|%Y%m%d_%H%M%S_%N|%Y%m%d|%Y%m%d%H|%Y-%m-%dT%H:%M:%S%z'
+  }
+  usage() {
+    local row aliases var def parser help shown
+    printf '%s\n' \
+      'phone_top_profile_v8 [options]' \
+      '' \
+      'Continuous Android raw top plus bounded read-only component evidence (R13).' \
+      'No arguments prints this help and performs no collection.' \
+      '' \
+      'Options (generated from the option factory):'
+    for row in "${OPT[@]}"; do
+      IFS='|' read -r aliases var def parser help <<<"$row"
+      shown=${aliases//,/ / }
+      printf '  %-34s %s' "$shown" "$help"
+      case $def in
+        empty) printf ' (default empty)' ;;
+        @allow0) printf ' (default built-in allowlist)' ;;
+        list) ;;
+        unset) printf ' (default preset)' ;;
+        *) printf ' (default %s)' "$def" ;;
+      esac
+      printf '\n'
+    done
+    printf '%s\n' \
+      '' \
+      'TIME is integer seconds or uses s/m/h/d. SIZE uses B/K/KB/M/MB/G/GB.' \
+      'Plain is the default: gzip and base64 are launched only for --encoding compact.' \
+      'Every native top is retained by default; exact repeats become timed SEEN records.' \
+      'JOBS and PROVIDERS are bounded package/UID projections, not global dumps.' \
+      'Runtime staging is private; public TXT files are unique, noclobber, append-only, and daily-rotated.'
+  }
+
+  (($#)) || {
+    usage
+    return 0
+  }
+
+  declare -A V=() SET=()
+  declare -a TOP_EXTRA=()
+  for row in "${OPT[@]}"; do
+    IFS='|' read -r aliases var def parser help <<<"$row"
+    case $var in
+      -|top_extra) ;;
+      *)
+        case ${SET[$var]-} in
+          1) ;;
+          *)
+            case $def in
+              @allow0) V[$var]=$ALLOW0 ;;
+              *) V[$var]=$def ;;
+            esac
+            SET[$var]=default
+            ;;
+        esac
+        ;;
+    esac
+  done
+
+  config_error() {
+    printf 'CONFIGURATION ERROR: %s\n' "$*" >&2
+    return 2
+  }
+  normalize_value() {
+    local parser=$1 val=$2
+    case $parser in
+      positive) positive "$val" || return 1 ;;
+      time) parse_time "$val" || return 1 ;;
+      time_min2)
+        parse_time "$val" || return 1
+        ((reply >= 2)) || return 1
+        ;;
+      time_min5)
+        parse_time "$val" || return 1
+        ((reply >= 5)) || return 1
+        ;;
+      time_min10)
+        parse_time "$val" || return 1
+        ((reply >= 10)) || return 1
+        ;;
+      unsigned) dec "$val" || return 1 ;;
+      percent0)
+        dec "${val%\%}" || return 1
+        ((reply <= 100)) || return 1
+        ;;
+      percent)
+        dec "${val%\%}" || return 1
+        ((reply >= 1 && reply <= 100)) || return 1
+        ;;
+      one_to_32)
+        positive "$val" || return 1
+        ((reply <= 32)) || return 1
+        ;;
+      size)
+        parse_size "$val" || return 1
+        ((reply > 0)) || return 1
+        ;;
+      size_or_inf)
+        case $val in
+          unset) reply=unset ;;
+          *) parse_size "$val" || return 1 ;;
+        esac
+        ;;
+      size0_inf)
+        parse_size "$val" || return 1
+        ((reply < 0)) && reply=0
+        ;;
+      delay)
+        case $val in
+          native) reply=native ;;
+          *) parse_time "$val" || return 1 ;;
+        esac
+        ;;
+      late_threshold)
+        if parse_pct100 "$val"; then
+          :
+        else
+          reply=-1
+        fi
+        ;;
+      hour_day_off)
+        case $val in hourly|daily|off) reply=$val ;; *) return 1 ;; esac
+        ;;
+      plain_compact)
+        case $val in plain|compact) reply=$val ;; *) return 1 ;; esac
+        ;;
+      saver)
+        case $val in max|high|mid|low|none) reply=$val ;; *) return 1 ;; esac
+        ;;
+      writable_dir)
+        case $val in
+          @downloads) reply=${HOME}/storage/downloads ;;
+          *) reply=$val ;;
+        esac
+        [[ -d $reply && -w $reply ]] || return 1
+        ;;
+      safe_prefix)
+        [[ $val =~ ^[A-Za-z0-9_.-]{1,80}$ ]] || return 1
+        reply=$val
+        ;;
+      command_path)
+        command -v "$val" >/dev/null 2>&1 || return 1
+        reply=$val
+        ;;
+      serial)
+        case $val in
+          empty) reply= ;;
+          *)
+            [[ $val =~ ^[A-Za-z0-9._:-]+$ ]] || return 1
+            reply=$val
+            ;;
+        esac
+        ;;
+      uid_or_any)
+        case $val in
+          any) reply=any ;;
+          *) dec "$val" || return 1 ;;
+        esac
+        ;;
+      regex)
+        ( [[ x =~ $val ]] ) 2>/dev/null
+        case $? in 2) return 1 ;; esac
+        reply=$val
+        ;;
+      *) return 1 ;;
+    esac
+    return 0
+  }
+
+  while (($#)); do
+    token=$1
+    shift
+    found=0
+    for row in "${OPT[@]}"; do
+      IFS='|' read -r aliases var def parser help <<<"$row"
+      IFS=',' read -r -a names <<<"$aliases"
+      for name in "${names[@]}"; do
+        if [[ $token == "$name" ]]; then
+          found=1
+          case $parser in
+            set_every_top)
+              V[every]=1
+              V[period]=0
+              SET[every]=1
+              SET[period]=1
+              ;;
+            true)
+              V[$var]=1
+              SET[$var]=1
+              ;;
+            paired_bool)
+              case $token in
+                --core-only|--no-surveillance|--no-packages) V[$var]=0 ;;
+                *) V[$var]=1 ;;
+              esac
+              SET[$var]=1
+              ;;
+            safe_top_token)
+              (($#)) || { config_error "$token needs a value"; return 2; }
+              val=$1
+              shift
+              case $val in
+                -s[1-9]|-s1[0-3]) TOP_EXTRA+=("$val") ;;
+                *)
+                  config_error "unsafe or entity-changing --top-arg: $val; only -s1 through -s13 are accepted"
+                  return 2
+                  ;;
+              esac
+              ;;
+            *)
+              (($#)) || { config_error "$token needs a value"; return 2; }
+              V[$var]=$1
+              SET[$var]=1
+              shift
+              ;;
+          esac
+          break
+        fi
+      done
+      ((found)) && break
+    done
+    if ((found == 0)); then
+      config_error "unknown option: $token"
+      return 2
+    fi
+  done
+
+  case ${V[help]} in
+    1) usage; return 0 ;;
+  esac
+
+  for row in "${OPT[@]}"; do
+    IFS='|' read -r aliases var def parser help <<<"$row"
+    case $parser in
+      set_every_top|safe_top_token|paired_bool|true) continue ;;
+    esac
+    normalize_value "$parser" "${V[$var]}" || {
+      config_error "invalid $aliases value: ${V[$var]}"
+      return 2
+    }
+    V[$var]=$reply
+  done
+
+  case ${V[logcat]}:${V[context]} in
+    1:0) config_error '--logcat requires --context'; return 2 ;;
+  esac
+
+  every=${V[every]}
+  period=${V[period]}
+  rows=${V[rows]}
+  delay=${V[delay]}
+  frame_cap=${V[frame_cap]}
+  out_dir=${V[out_dir]}
+  prefix=${V[prefix]}
+  low_arg=${V[low]}
+  high_arg=${V[high]}
+  refresh=${V[refresh]}
+  budget=${V[budget]}
+  batch_cap=${V[batch_cap]}
+  diag_to=${V[diag_to]}
+  context=${V[context]}
+  context_ttl=${V[context_ttl]}
+  with_logcat=${V[logcat]}
+  watch=${V[watch]}
+  allow=${V[allow]}
+  packages=${V[packages]}
+  delta_match=${V[match]}
+  encoding=${V[encoding]}
+  seen_cap=${V[seen_cap]}
+  prev_cap=${V[prev_cap]}
+  saver=${V[saver]}
+  checkpoint_interval=${V[checkpoint]}
+  duration=${V[duration]}
+  until=${V[until]}
+  max_reports=${V[max_reports]}
+  max_bytes=${V[max_bytes]}
+  source_to=${V[source_to]}
+  adb=${V[adb]}
+  serial=${V[serial]}
+  shell_uid=${V[shell_uid]}
+
+  case $saver in
+    max) hour_cap=0; day_cap=0; total_cap=0 ;;
+    high) hour_cap=1000000; day_cap=10000000; total_cap=100000000 ;;
+    mid) hour_cap=10000000; day_cap=100000000; total_cap=-1 ;;
+    low) hour_cap=100000000; day_cap=-1; total_cap=-1 ;;
+    none) hour_cap=-1; day_cap=-1; total_cap=-1 ;;
+  esac
+  case ${V[hour_cap]} in unset) ;; *) hour_cap=${V[hour_cap]} ;; esac
+  case ${V[day_cap]} in unset) ;; *) day_cap=${V[day_cap]} ;; esac
+  case ${V[total_cap]} in unset) ;; *) total_cap=${V[total_cap]} ;; esac
+  if [[ $delay == native ]]; then
+    effective_source_to=$source_to
+  else
+    ((delay <= 9223372036854775802)) || {
+      config_error '--delay is too large for source-timeout arithmetic'
+      return 2
+    }
+    effective_source_to=$((delay + 5))
+    ((effective_source_to < source_to)) && effective_source_to=$source_to
+  fi
+
+  required_tools=(timeout sha256sum awk head tail wc mktemp cmp mv mkdir
+    grep date sleep truncate stat cat rm rmdir dd nproc getconf)
+  case $encoding in compact) required_tools+=(gzip base64) ;; esac
+  for tool in "${required_tools[@]}"; do
+    command -v "$tool" >/dev/null 2>&1 || {
+      config_error "missing local command: $tool"
+      return 2
+    }
+  done
+
+  runtime=$(mktemp -d "${TMPDIR:-/tmp}/phone_top_v8.XXXXXXXX") || {
+    config_error 'cannot create private Termux runtime'
+    return 2
+  }
+  case $runtime in
+    "${TMPDIR:-/tmp}"/phone_top_v8.*) ;;
+    *) config_error 'private runtime validation failed'; return 2 ;;
+  esac
+
+  reason=running
+  finish_done=0
+  output_open=0
+  hard_cap_closed=0
+  output_failed=0
+  ofd=
+  file=
+  out_day=
+  out_hour=
+  record_seq=0
+  state_serial=0
+  source_index=0
+  selected_n=0
+  saved_n=0
+  run_bytes=0
+  file_bytes=0
+  day_bytes=0
+  hour_bytes=0
+  o_run_bytes=0
+  o_day_bytes=0
+  o_hour_bytes=0
+  next_checkpoint=$((SECONDS + checkpoint_interval))
+  run_start_seconds=$SECONDS
+  run_start_epoch=$(date +%s)
+  invocation_epoch=run_$BASHPID
+  profile_epoch=$invocation_epoch
+  cache_serial=0
+  cache_dir=
+  admission_closed=0
+  seen_count=0
+  prev_bytes=0
+  prev_serial=0
+  frame_open=0
+  frame_file=
+  frame_epoch=0
+  frame_stamp=
+  frame_day=
+  frame_hour=
+  frame_iso=
+  frame_kept=0
+  frame_total=0
+  frame_drop_bytes=0
+  frame_drop_lines=0
+  last_selected_epoch=0
+  source_fd=
+  source_pid=
+  source_start=
+  remote_top_pid=
+  remote_top_start=
+  source_attempt=0
+  source_retry=0
+  source_noise=
+  source_owner_seen=0
+  source_healthy_frames=0
+  worker_pid=
+  worker_start=
+  worker_stage=
+  worker_count=0
+  worker_context_mode=none
+  worker_deadline=0
+  worker_ctrl_start=0
+  worker_source_cpu_start=0
+  worker_source_cpu_tuple=
+  worker_child_note=
+  capture_remote_pid=
+  controller_start=
+  context_due=0
+  context_attempt=0
+  context_epoch_done=
+  o_refresh_due=0
+  active_at=0
+  duty_debt=0
+  duty_at=$((SECONDS * 1000))
+  thresholds_ready=0
+  topmax100=0
+  topmax_genuine=0
+
+  declare -a A=("$adb")
+  declare -A SEEN=() PREV_STATE=() PREV_SIZE=() PREV_SHA=()
+  declare -A PREV_PATH=() PREV_KIND=() STATE_KIND=()
+  declare -a PREV_KEYS=()
+  declare -A OCC_TOTAL=() OCC_PENDING=() OCC_ADDED=()
+  declare -a OCC_ORDER=()
+  declare -A PKG_P=() PKG_U=()
+  declare -a PKG_PAIRS=()
+  declare -A ENTITY_KIND=() ENTITY_LABEL=() ENTITY_USER=() ENTITY_UID=()
+  declare -A ENTITY_PKG=() ENTITY_CMD=() ENTITY_PID=() ACTIVE=()
+  declare -a ENTITY_KEYS=()
+  declare -A OWNED_START=()
+
+  set_reason() {
+    case $reason in
+      running) reason=$1 ;;
+    esac
+  }
+
+  bytes_file() {
+    reply=$(wc -c <"$1")
+    reply=${reply//[[:space:]]/}
+    dec "$reply"
+  }
+  sha_file() {
+    local rest
+    read -r reply rest < <(sha256sum -- "$1")
+    [[ $reply =~ ^[0-9a-f]{64}$ ]]
+  }
+  host_stat_for_namespace_pid() {
+    local wanted=$1 status line self_line= self_depth depth candidate host=
+    local -a fields=()
+    HOST_PROC_STAT=
+    [[ $wanted =~ ^[1-9][0-9]*$ ]] || return 1
+    while IFS= read -r line; do
+      case $line in NSpid:*) self_line=$line; break ;; esac
+    done </proc/self/status
+    if [[ -z $self_line ]]; then
+      HOST_PROC_STAT=$(<"/proc/$wanted/stat") || return 1
+      return 0
+    fi
+    read -r -a fields <<<"${self_line#NSpid:}"
+    self_depth=${#fields[@]}
+    ((self_depth > 0)) || return 1
+    if ((self_depth == 1)); then
+      HOST_PROC_STAT=$(<"/proc/$wanted/stat") || return 1
+      return 0
+    fi
+    for status in /proc/[1-9][0-9]*/status; do
+      [[ -r $status ]] || continue
+      line=
+      while IFS= read -r line; do
+        case $line in NSpid:*) break ;; esac
+      done <"$status" 2>/dev/null
+      case $line in NSpid:*) ;; *) continue ;; esac
+      read -r -a fields <<<"${line#NSpid:}"
+      depth=${#fields[@]}
+      ((depth == self_depth)) || continue
+      ((${fields[depth - 1]} == wanted)) || continue
+      candidate=${status#/proc/}
+      candidate=${candidate%/status}
+      case $host in
+        ''|"$candidate") host=$candidate ;;
+        *) return 1 ;;
+      esac
+    done
+    [[ $host =~ ^[1-9][0-9]*$ ]] || return 1
+    HOST_PROC_STAT=$(<"/proc/$host/stat") || return 1
+  }
+  parse_host_proc_stat() {
+    local tail=${HOST_PROC_STAT##*) }
+    set -- $tail
+    (($# >= 20)) || return 1
+    HOST_PROC_STATE=${1-}
+    HOST_PROC_START=${20-}
+    [[ $HOST_PROC_START =~ ^[0-9]+$ ]]
+  }
+  pid_start_local() {
+    local p=$1
+    host_stat_for_namespace_pid "$p" || return 1
+    parse_host_proc_stat || return 1
+    reply=$HOST_PROC_START
+  }
+  owned_add() {
+    local p=$1 start=$2
+    [[ $p =~ ^[1-9][0-9]*$ && $start =~ ^[0-9]+$ ]] || return 1
+    OWNED_START[$p]=$start
+  }
+  owned_remove() {
+    unset 'OWNED_START[$1]'
+  }
+  owned_active() {
+    local p=$1 expected=${OWNED_START[$1]-}
+    [[ -n $expected ]] || return 1
+    pid_start_local "$p" || {
+      owned_remove "$p"
+      return 1
+    }
+    [[ $reply == "$expected" ]] || {
+      owned_remove "$p"
+      return 1
+    }
+  }
+  stop_owned_local() {
+    local p=${1-} expected=${2-} i state=
+    [[ $p =~ ^[1-9][0-9]*$ ]] || return 0
+    host_stat_for_namespace_pid "$p" ||
+      { wait "$p" 2>/dev/null; return 0; }
+    parse_host_proc_stat || { wait "$p" 2>/dev/null; return 0; }
+    [[ $HOST_PROC_START == "$expected" ]] ||
+      { wait "$p" 2>/dev/null; return 0; }
+    kill "$p" 2>/dev/null
+    for ((i=0; i<30; i++)); do
+      kill -0 "$p" 2>/dev/null
+      case $? in 0) ;; *) break ;; esac
+      if host_stat_for_namespace_pid "$p" && parse_host_proc_stat; then
+        [[ $HOST_PROC_START == "$expected" ]] || break
+        state=$HOST_PROC_STATE
+        case $state in Z) break ;; esac
+      else
+        break
+      fi
+      sleep 0.1
+    done
+    kill -0 "$p" 2>/dev/null
+    case $? in
+      0)
+        case $state in
+          Z) ;;
+          *)
+            if host_stat_for_namespace_pid "$p" && parse_host_proc_stat &&
+               [[ $HOST_PROC_START == "$expected" ]]; then
+              kill -9 "$p" 2>/dev/null
+            fi
+            ;;
+        esac
+        ;;
+    esac
+    wait "$p" 2>/dev/null
+  }
+  cpu_ticks_self() {
+    local s tail
+    s=$(<"/proc/self/stat") || { reply=0; return; }
+    tail=${s##*) }
+    set -- $tail
+    (($# >= 15)) || { reply=0; return; }
+    reply=$((${12} + ${13} + ${14} + ${15}))
+  }
+  pid_start_local "$BASHPID" || {
+    config_error 'cannot validate the Termux controller PID'
+    rm -rf -- "$runtime"
+    return 2
+  }
+  controller_start=$reply
+  owned_add "$BASHPID" "$controller_start" || {
+    config_error 'cannot register the Termux controller PID'
+    rm -rf -- "$runtime"
+    return 2
+  }
+
+  unique_open() {
+    local stamp=$1 candidate attempt rc create_fd append_fd
+    for ((attempt=0; attempt<64; attempt++)); do
+      candidate=$out_dir/${prefix}_${stamp}_${RANDOM}${RANDOM}.txt
+      set -o noclobber
+      { exec {create_fd}>"$candidate"; } 2>/dev/null
+      rc=$?
+      set +o noclobber
+      if ((rc == 0)); then
+        exec {append_fd}>>"/proc/self/fd/$create_fd" 2>/dev/null
+        rc=$?
+        exec {create_fd}>&-
+        if ((rc == 0)); then
+          ofd=$append_fd
+          file=$candidate
+          output_open=1
+          return 0
+        fi
+        rm -f -- "$candidate"
+      fi
+      ofd=
+    done
+    return 1
+  }
+
+  write_record() {
+    local type=$1 body=$2 charge=${3-0} n candidate header footer complete pre rc
+    ((output_open)) || return 1
+    ((hard_cap_closed == 0 && output_failed == 0)) || return 75
+    [[ -f $body && -r $body ]] || return 1
+    bytes_file "$body" || return 1
+    n=$reply
+    candidate=$((record_seq + 1))
+    printf -v header '@BEGIN seq=%d type=%s body_bytes=%d\n' "$candidate" "$type" "$n"
+    printf -v footer '\n@END seq=%d\n' "$candidate"
+    complete=$((${#header} + n + ${#footer}))
+    if ((max_bytes > 0 && run_bytes + complete > max_bytes)); then
+      hard_cap_closed=1
+      set_reason max_bytes
+      return 75
+    fi
+    pre=$file_bytes
+    printf '%s' "$header" >&"$ofd" &&
+      cat -- "$body" >&"$ofd" &&
+      printf '%s' "$footer" >&"$ofd"
+    rc=$?
+    if ((rc)); then
+      truncate -s "$pre" "/proc/self/fd/$ofd" 2>/dev/null
+      case $? in
+        0) ;;
+        *) exec {ofd}>&-; ofd=; output_open=0 ;;
+      esac
+      output_failed=1
+      set_reason write_error
+      return 1
+    fi
+    record_seq=$candidate
+    file_bytes=$((file_bytes + complete))
+    day_bytes=$((day_bytes + complete))
+    hour_bytes=$((hour_bytes + complete))
+    run_bytes=$((run_bytes + complete))
+    if ((charge)); then
+      o_hour_bytes=$((o_hour_bytes + complete))
+      o_day_bytes=$((o_day_bytes + complete))
+      o_run_bytes=$((o_run_bytes + complete))
+    fi
+    reply=$candidate
+  }
+
+  text_record() {
+    local type=$1 meta=$2 charge=${3-0} body=$runtime/text_$BASHPID.$RANDOM
+    printf '%s\n' "$meta" >"$body" || return 1
+    write_record "$type" "$body" "$charge"
+    local rc=$?
+    rm -f -- "$body"
+    return "$rc"
+  }
+
+  saver_open() {
+    ((hour_cap < 0 || o_hour_bytes < hour_cap)) &&
+      ((day_cap < 0 || o_day_bytes < day_cap)) &&
+      ((total_cap < 0 || o_run_bytes < total_cap))
+  }
+  decay() {
+    local now=$1 elapsed
+    ((now < duty_at)) && now=$duty_at
+    elapsed=$((now - duty_at))
+    duty_debt=$((duty_debt - elapsed))
+    ((duty_debt < 0)) && duty_debt=0
+    duty_at=$now
+  }
+  observer_open() {
+    local now=$((SECONDS * 1000))
+    decay "$now"
+    ((budget > 0)) || return 1
+    saver_open || return 1
+    ((duty_debt == 0))
+  }
+  finish_observer_interval() {
+    local start=$1 end=$2 cpu_ms=$3 add
+    ((end < start)) && end=$start
+    decay "$start"
+    if ((budget > 0)); then
+      ((cpu_ms <= 92233720368547758)) || cpu_ms=92233720368547758
+      add=$((100 * cpu_ms / budget - (end - start)))
+      duty_debt=$((duty_debt + add))
+      ((duty_debt < 0)) && duty_debt=0
+    fi
+    duty_at=$end
+  }
+
+  clear_prev() {
+    local chain p
+    for chain in "${PREV_KEYS[@]}"; do
+      p=${PREV_PATH[$chain]-}
+      case $p in "$runtime"/prev_*.raw) rm -f -- "$p" ;; esac
+    done
+    SEEN=()
+    PREV_STATE=()
+    PREV_SIZE=()
+    PREV_SHA=()
+    PREV_PATH=()
+    PREV_KIND=()
+    STATE_KIND=()
+    PREV_KEYS=()
+    admission_closed=0
+    seen_count=0
+    prev_bytes=0
+  }
+  advance_prev() {
+    local chain=$1 sid=$2 n=$3 sha=$4 kind=$5 stage=$6 retain=$7
+    local old=${PREV_PATH[$chain]-} old_n=0 projected new=
+    case $old in
+      "$runtime"/prev_*.raw) old_n=${PREV_SIZE[$chain]-0} ;;
+      *) old= ;;
+    esac
+    case ${PREV_STATE[$chain]+set} in
+      set) ;;
+      *) PREV_KEYS+=("$chain") ;;
+    esac
+    if ((retain == 0)); then
+      PREV_STATE[$chain]=$sid
+      PREV_SIZE[$chain]=$n
+      PREV_SHA[$chain]=$sha
+      PREV_KIND[$chain]=$kind
+      PREV_PATH[$chain]=
+      case $old in
+        '') ;;
+        *) rm -f -- "$old"; prev_bytes=$((prev_bytes - old_n)) ;;
+      esac
+      rm -f -- "$stage"
+      return 0
+    fi
+    projected=$((prev_bytes - old_n + n))
+    if ((projected <= prev_cap)); then
+      ((prev_serial++))
+      new=$runtime/prev_$prev_serial.raw
+      if mv -- "$stage" "$new"; then
+        PREV_STATE[$chain]=$sid
+        PREV_SIZE[$chain]=$n
+        PREV_SHA[$chain]=$sha
+        PREV_KIND[$chain]=$kind
+        PREV_PATH[$chain]=$new
+        case $old in
+          '') ;;
+          "$new") ;;
+          *) rm -f -- "$old" ;;
+        esac
+        prev_bytes=$projected
+        return 0
+      fi
+    fi
+    case $old in '') ;; *) rm -f -- "$old"; prev_bytes=$((prev_bytes - old_n)) ;; esac
+    rm -f -- "$stage"
+    unset 'PREV_STATE[$chain]' 'PREV_SIZE[$chain]' 'PREV_SHA[$chain]' \
+      'PREV_KIND[$chain]' 'PREV_PATH[$chain]'
+    return 0
+  }
+
+  common_prefix() {
+    local old=$1 fresh=$2 limit=$3 lo=0 hi=$limit mid
+    while ((lo < hi)); do
+      mid=$(((lo + hi + 1) / 2))
+      cmp -s -n "$mid" -- "$old" "$fresh"
+      case $? in 0) lo=$mid ;; *) hi=$((mid - 1)) ;; esac
+    done
+    reply=$lo
+  }
+  common_suffix() {
+    local old=$1 fresh=$2 limit=$3 tag=$4 lo=0 hi=$limit mid
+    local a=$runtime/suffix_a_$tag b=$runtime/suffix_b_$tag
+    while ((lo < hi)); do
+      mid=$(((lo + hi + 1) / 2))
+      tail -c "$mid" -- "$old" >"$a" &&
+        tail -c "$mid" -- "$fresh" >"$b" &&
+        cmp -s -- "$a" "$b"
+      case $? in 0) lo=$mid ;; *) hi=$((mid - 1)) ;; esac
+    done
+    rm -f -- "$a" "$b"
+    reply=$lo
+  }
+  make_delta() {
+    local old=$1 fresh=$2 old_n=$3 new_n=$4 tag=$5 min prefix suffix room
+    local matched maximum middle rebuilt
+    min=$old_n
+    ((new_n < min)) && min=$new_n
+    common_prefix "$old" "$fresh" "$min"
+    prefix=$reply
+    room=$((min - prefix))
+    common_suffix "$old" "$fresh" "$room" "$tag"
+    suffix=$reply
+    matched=$((prefix + suffix))
+    maximum=$old_n
+    ((new_n > maximum)) && maximum=$new_n
+    if ((maximum)); then DELTA_SIM=$((100 * matched / maximum)); else DELTA_SIM=100; fi
+    ((DELTA_SIM >= delta_match)) || return 1
+    DELTA_MIDDLE_BYTES=$((new_n - prefix - suffix))
+    ((DELTA_MIDDLE_BYTES < new_n)) || return 1
+    DELTA_PREFIX=$prefix
+    DELTA_SUFFIX=$suffix
+    DELTA_MIDDLE=$runtime/delta_middle_$tag
+    DELTA_REBUILT=$runtime/delta_rebuilt_$tag
+    dd if="$fresh" of="$DELTA_MIDDLE" bs=1 skip="$prefix" \
+      count="$DELTA_MIDDLE_BYTES" status=none || return 1
+    {
+      ((prefix == 0)) || head -c "$prefix" -- "$old"
+      cat -- "$DELTA_MIDDLE"
+      ((suffix == 0)) || tail -c "$suffix" -- "$old"
+    } >"$DELTA_REBUILT" || return 1
+    bytes_file "$DELTA_REBUILT" || return 1
+    ((reply == new_n)) || return 1
+    cmp -s -- "$fresh" "$DELTA_REBUILT"
+  }
+  wire_payload() {
+    local src=$1 tag=$2 raw_n gz b64
+    bytes_file "$src" || return 1
+    raw_n=$reply
+    WIRE_PATH=$src
+    WIRE_MODE=plain
+    WIRE_BYTES=$raw_n
+    case $encoding in
+      compact)
+        gz=$runtime/wire_$tag.gz
+        b64=$runtime/wire_$tag.b64
+        gzip -1 -n -c -- "$src" >"$gz"
+        case $? in
+          0)
+            base64 -w 0 -- "$gz" >"$b64"
+            case $? in
+              0)
+                bytes_file "$b64" || return 1
+                if ((reply < raw_n)); then
+                  WIRE_PATH=$b64
+                  WIRE_MODE=gzip64
+                  WIRE_BYTES=$reply
+                fi
+                ;;
+            esac
+            ;;
+        esac
+        rm -f -- "$gz"
+        ;;
+    esac
+  }
+  state_header() {
+    local sid=$1 domain=$2 chain=$3 kind=$4 raw_n=$5 sha=$6
+    local wire_mode=$7 wire_n=$8 observation=${9-} base=${10-}
+    local prefix=${11-0} suffix=${12-0} middle=${13-0} sim=${14-0}
+    local ec eo extra=
+    esc "$chain"; ec=$reply
+    esc "$observation"; eo=$reply
+    case $kind in
+      delta)
+        printf -v extra '\tbase=%s\tprefix_bytes=%s\tsuffix_bytes=%s\tmiddle_bytes=%s\tsimilarity=%s' \
+          "$base" "$prefix" "$suffix" "$middle" "$sim"
+        ;;
+    esac
+    case $observation in '') ;; *) extra+=$'\tobservation='"$eo" ;; esac
+    printf -v STATE_HEADER \
+      'id=%s\tdomain=%s\tchain=%s\tkind=%s\traw_bytes=%s\traw_sha256=%s%s\nPAYLOAD wire=%s bytes=%s\n' \
+      "$sid" "$domain" "$ec" "$kind" "$raw_n" "$sha" "$extra" \
+      "$wire_mode" "$wire_n"
+  }
+  build_state_body() {
+    local body=$1 wire=$8
+    state_header "$2" "$3" "$4" "$5" "$6" "$7" "$9" "${10}" \
+      "${11-}" "${12-}" "${13-0}" "${14-0}" "${15-0}" "${16-0}"
+    {
+      printf '%s' "$STATE_HEADER"
+      cat -- "$wire"
+    } >"$body"
+  }
+
+  COMMIT_ID=
+  COMMIT_NEW=0
+  commit_state() {
+    local domain=$1 chain=$2 stage=$3 observation=$4 heavy=$5 charge=$6
+    local retain=$7 n sha lookup sid immediate=0 tag full_body delta_body
+    local full_wire full_mode full_n old old_n chosen kind=full
+    local delta_n logical_full logical_delta
+    [[ -f $stage ]] || return 1
+    bytes_file "$stage" || return 1
+    n=$reply
+    sha_file "$stage" || return 1
+    sha=$reply
+    lookup=$chain$'\x1f'$n$'\x1f'$sha
+    sid=${SEEN[$lookup]-}
+    if [[ ${PREV_SIZE[$chain]-x} == "$n" && ${PREV_SHA[$chain]-x} == "$sha" ]]; then
+      immediate=1
+      case $sid in '') sid=${PREV_STATE[$chain]-} ;; esac
+    fi
+    if [[ -n $sid ]]; then
+      if ((immediate)); then
+        rm -f -- "$stage"
+      else
+        advance_prev "$chain" "$sid" "$n" "$sha" "${STATE_KIND[$sid]-full}" \
+          "$stage" "$retain"
+      fi
+      COMMIT_ID=$sid
+      COMMIT_NEW=0
+      return 0
+    fi
+
+    sid=S$((state_serial + 1))
+    tag=${sid}_$RANDOM
+    wire_payload "$stage" "${tag}_full" || return 1
+    full_wire=$WIRE_PATH
+    full_mode=$WIRE_MODE
+    full_n=$WIRE_BYTES
+    full_body=$runtime/state_full_$tag
+    build_state_body "$full_body" "$sid" "$domain" "$chain" full "$n" "$sha" \
+      "$full_wire" "$full_mode" "$full_n" "$observation" || return 1
+    chosen=$full_body
+
+    old=${PREV_PATH[$chain]-}
+    old_n=${PREV_SIZE[$chain]-0}
+    if ((heavy)) && [[ -f $old ]] && [[ ${PREV_KIND[$chain]-full} == full ]]; then
+      make_delta "$old" "$stage" "$old_n" "$n" "$tag"
+      case $? in
+        0)
+          state_header "$sid" "$domain" "$chain" full "$n" "$sha" plain "$n" \
+            "$observation"
+          logical_full=$((${#STATE_HEADER} + n))
+          state_header "$sid" "$domain" "$chain" delta "$n" "$sha" plain \
+            "$DELTA_MIDDLE_BYTES" "$observation" "${PREV_STATE[$chain]}" \
+            "$DELTA_PREFIX" "$DELTA_SUFFIX" "$DELTA_MIDDLE_BYTES" "$DELTA_SIM"
+          logical_delta=$((${#STATE_HEADER} + DELTA_MIDDLE_BYTES))
+          if ((logical_delta < logical_full)); then
+            wire_payload "$DELTA_MIDDLE" "${tag}_delta" || return 1
+            delta_body=$runtime/state_delta_$tag
+            build_state_body "$delta_body" "$sid" "$domain" "$chain" delta "$n" "$sha" \
+              "$WIRE_PATH" "$WIRE_MODE" "$WIRE_BYTES" "$observation" \
+              "${PREV_STATE[$chain]}" "$DELTA_PREFIX" "$DELTA_SUFFIX" \
+              "$DELTA_MIDDLE_BYTES" "$DELTA_SIM" || return 1
+            bytes_file "$delta_body" || return 1
+            delta_n=$reply
+            bytes_file "$full_body" || return 1
+            if ((delta_n < reply)); then
+              chosen=$delta_body
+              kind=delta
+            fi
+          fi
+          ;;
+      esac
+    fi
+
+    write_record STATE "$chosen" "$charge" || return
+    state_serial=$((state_serial + 1))
+    STATE_KIND[$sid]=$kind
+    if ((admission_closed == 0)); then
+      SEEN[$lookup]=$sid
+      ((seen_count++))
+      ((seen_count >= seen_cap)) && admission_closed=1
+    fi
+    advance_prev "$chain" "$sid" "$n" "$sha" "$kind" "$stage" "$retain"
+    rm -f -- "$full_body" "${delta_body-}" "${DELTA_MIDDLE-}" \
+      "${DELTA_REBUILT-}" "$runtime/wire_${tag}_full.b64" \
+      "$runtime/wire_${tag}_delta.b64"
+    COMMIT_ID=$sid
+    COMMIT_NEW=1
+  }
+
+  occurrence_tuple() {
+    local iso=$1 source=$2 partial=$3 raw_only=$4 truncated=$5
+    local drop_b=$6 drop_l=$7 x="$iso|source=$source"
+    ((partial)) && x+="|partial=1"
+    ((raw_only)) && x+="|raw_only=1"
+    ((truncated)) && x+="|truncated=1"
+    ((drop_b)) && x+="|drop_bytes=$drop_b"
+    ((drop_l)) && x+="|drop_lines=$drop_l"
+    esc "$x"
+  }
+  init_occurrence() {
+    local sid=$1
+    case ${OCC_TOTAL[$sid]+set} in
+      set) ;;
+      *)
+        OCC_TOTAL[$sid]=1
+        OCC_PENDING[$sid]=
+        OCC_ADDED[$sid]=0
+        OCC_ORDER+=("$sid")
+        ;;
+    esac
+  }
+  flush_occurrences() {
+    local sid added body tuple rc
+    ((max_bytes == 0)) || return 0
+    for sid in "${OCC_ORDER[@]}"; do
+      added=${OCC_ADDED[$sid]-0}
+      ((added)) || continue
+      body=$runtime/seen_$RANDOM
+      tuple=${OCC_PENDING[$sid]}
+      printf 'state=%s\ttotal=%s\tadded=%s\tat={%s}\n' \
+        "$sid" "${OCC_TOTAL[$sid]}" "$added" "$tuple" >"$body" || return 1
+      write_record SEEN "$body" 0 || {
+        rc=$?
+        rm -f -- "$body"
+        return "$rc"
+      }
+      saved_n=$((saved_n + added))
+      OCC_PENDING[$sid]=
+      OCC_ADDED[$sid]=0
+      rm -f -- "$body"
+    done
+  }
+  add_top_occurrence() {
+    local sid=$1 tuple=$2 body rc
+    init_occurrence "$sid"
+    if ((max_bytes > 0)); then
+      body=$runtime/seen_one_$RANDOM
+      printf 'state=%s\ttotal=%s\tadded=1\tat={%s}\n' \
+        "$sid" "$((OCC_TOTAL[$sid] + 1))" "$tuple" >"$body" || return 1
+      write_record SEEN "$body" 0 || {
+        rc=$?
+        rm -f -- "$body"
+        return "$rc"
+      }
+      OCC_TOTAL[$sid]=$((OCC_TOTAL[$sid] + 1))
+      saved_n=$((saved_n + 1))
+      rm -f -- "$body"
+    else
+      OCC_TOTAL[$sid]=$((OCC_TOTAL[$sid] + 1))
+      OCC_ADDED[$sid]=$((OCC_ADDED[$sid] + 1))
+      OCC_PENDING[$sid]+="${OCC_PENDING[$sid]:+;}$tuple"
+    fi
+  }
+
+  ro() {
+    local seconds=$1
+    shift
+    timeout -k 2s "${seconds}s" "${A[@]}" shell -T "$@"
+  }
+  read_device_identity() {
+    local state actual boot n clk
+    state=$(timeout -k 2s "${diag_to}s" "${A[@]}" get-state 2>/dev/null)
+    [[ $state == device ]] || return 2
+    actual=$(ro "$diag_to" id -u 2>/dev/null)
+    actual=${actual//$'\r'/}
+    actual=${actual//$'\n'/}
+    [[ $actual =~ ^[0-9]+$ ]] || return 2
+    case $shell_uid in
+      any) ;;
+      *) [[ $actual == "$shell_uid" ]] || return 2 ;;
+    esac
+    boot=$(ro "$diag_to" cat /proc/sys/kernel/random/boot_id 2>/dev/null)
+    boot=${boot//$'\r'/}
+    boot=${boot//$'\n'/}
+    [[ $boot =~ ^[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}$ ]] ||
+      return 2
+    n=$(ro "$diag_to" nproc 2>/dev/null)
+    n=${n//$'\r'/}
+    if dec "$n" && ((reply > 0 && reply < 1024)); then
+      RECHECK_NPROC=$reply
+    else
+      RECHECK_NPROC=1
+    fi
+    clk=$(ro "$diag_to" getconf CLK_TCK 2>/dev/null)
+    clk=${clk//$'\r'/}
+    if dec "$clk" && ((reply > 0)); then
+      RECHECK_CLK=$reply
+    else
+      RECHECK_CLK=100
+    fi
+    RECHECK_UID=$actual
+    RECHECK_BOOT=$boot
+  }
+  connect_device() {
+    local -a devices=()
+    if [[ -z $serial ]]; then
+      mapfile -t devices < <(
+        timeout -k 2s "${diag_to}s" "$adb" devices 2>/dev/null |
+          awk 'NR>1 && $2=="device" {print $1}'
+      )
+      ((${#devices[@]} == 1)) || {
+        config_error "use --serial; ready adb devices=${#devices[@]}"
+        return 2
+      }
+      serial=${devices[0]}
+    fi
+    A=("$adb" -s "$serial")
+    read_device_identity || {
+      config_error 'adb target identity or boot ID is unavailable'
+      return 2
+    }
+    adb_uid=$RECHECK_UID
+    boot_id=$RECHECK_BOOT
+    device_nproc=$RECHECK_NPROC
+    remote_clk=$RECHECK_CLK
+    local_clk=$(getconf CLK_TCK 2>/dev/null)
+    if dec "$local_clk" && ((reply > 0)); then
+      local_clk=$reply
+    else
+      local_clk=100
+    fi
+  }
+
+  inventory_file=
+  capture_inventory() {
+    local stage=$runtime/inventory_$out_day.raw line user= pkg= uid= k pair
+    PKG_P=()
+    PKG_U=()
+    PKG_PAIRS=()
+    inventory_file=$stage
+    if ((packages == 0)); then
+      printf 'inventory disabled by --no-packages\n' >"$stage"
+      inventory_rc=disabled
+      return 0
+    fi
+    timeout -k 2s "$((diag_to * 4))s" "${A[@]}" shell -T sh -s \
+      "$shell_uid" >"$stage" 2>&1 <<'V8_INVENTORY'
+guard=$1
+actual=$(id -u 2>/dev/null)
+if printf '%s\n' "$actual" | grep -Eq '^[0-9]+$'; then
+  :
+else
+  printf 'UID_GUARD actual=nonnumeric required=%s\n' "$guard"
+  exit 46
+fi
+case $guard in
+  any) ;;
+  *) [ "$actual" = "$guard" ] || {
+       printf 'UID_GUARD actual=%s required=%s\n' "$actual" "$guard"
+       exit 46
+     } ;;
+esac
+users=$(
+  {
+    cmd user list 2>&1
+    pm list users 2>&1
+    dumpsys user 2>&1
+  }
+)
+printf '%s\n' '--- USERS'
+printf '%s\n' "$users"
+{
+  printf '%s\n' "$users" |
+    sed -n 's/.*UserInfo{\([0-9][0-9]*\):.*/\1/p'
+  printf '%s\n' 0
+} |
+  sort -nu |
+  while IFS= read -r user; do
+    printf '@@V8_USER %s\n' "$user"
+    listing=$(pm list packages -U --user "$user" 2>&1)
+    case $listing in
+      *package:*) ;;
+      *) listing=$(cmd package list packages -U --user "$user" 2>&1) ;;
+    esac
+    printf '%s\n' "$listing"
+  done
+exit 0
+V8_INVENTORY
+    inventory_rc=$?
+    while IFS= read -r line; do
+      line=${line%$'\r'}
+      case $line in
+        '@@V8_USER '*)
+          user=${line#@@V8_USER }
+          dec "$user" || user=
+          ;;
+        package:*)
+          [[ -n $user ]] || continue
+          if [[ $line =~ ^package:([A-Za-z0-9_.]+).*uid:([0-9]+) ]]; then
+            pkg=${BASH_REMATCH[1]}
+            uid=${BASH_REMATCH[2]}
+            valid_pkg "$pkg" || continue
+            dec "$uid" || continue
+            k=$user$'\x1f'$pkg
+            case ${PKG_P[$k]+set} in
+              set) ;;
+              *)
+                PKG_P[$k]=$uid
+                pair=$user$'\x1f'$pkg
+                PKG_PAIRS+=("$pair")
+                ;;
+            esac
+            k=$user$'\x1f'$uid
+            case " ${PKG_U[$k]-} " in
+              *" $pkg "*) ;;
+              *) PKG_U[$k]="${PKG_U[$k]:+${PKG_U[$k]} }$pkg" ;;
+            esac
+          fi
+          ;;
+      esac
+    done <"$stage"
+  }
+
+  remember_entity() {
+    local key=$1 kind=$2 label=$3 user=$4 uid=$5 pkg=$6 cmd=$7 pid=$8
+    case ${ENTITY_KIND[$key]+set} in
+      set) ;;
+      *) ENTITY_KEYS+=("$key") ;;
+    esac
+    ENTITY_KIND[$key]=$kind
+    ENTITY_LABEL[$key]=$label
+    ENTITY_USER[$key]=$user
+    ENTITY_UID[$key]=$uid
+    ENTITY_PKG[$key]=$pkg
+    ENTITY_CMD[$key]=$cmd
+    ENTITY_PID[$key]=$pid
+  }
+  resolve_entity() {
+    local linux_user=$1 args=$2 pid=$3 observed_uid=$4
+    local android_user=- pkg=- cmdword base key k mapped candidates
+    cmdword=${args%% *}
+    base=${cmdword%%:*}
+    TARGET_KIND=other
+    TARGET_LABEL=$linux_user:$observed_uid:$args
+    TARGET_USER=-
+    TARGET_UID=$observed_uid
+    TARGET_PKG=-
+    TARGET_CMD=$base
+    if [[ $linux_user =~ ^u([0-9]+)_[ai][0-9]+$ ]]; then
+      android_user=${BASH_REMATCH[1]}
+      TARGET_USER=$android_user
+      k=$android_user$'\x1f'$base
+      mapped=${PKG_P[$k]-}
+      if [[ -n $mapped && $mapped == "$observed_uid" ]]; then
+        pkg=$base
+        TARGET_KIND=app
+      elif [[ -z $mapped ]]; then
+        k=$android_user$'\x1f'$observed_uid
+        candidates=${PKG_U[$k]-}
+        set -- $candidates
+        if (($# == 1)) && valid_pkg "$1"; then
+          pkg=$1
+          TARGET_KIND=app
+        else
+          TARGET_KIND=ambiguous
+        fi
+      else
+        TARGET_KIND=ambiguous
+      fi
+      case $TARGET_KIND in
+        app)
+          TARGET_PKG=$pkg
+          TARGET_CMD=$base
+          TARGET_LABEL=$android_user:$pkg
+          join4 app "$android_user" "$pkg" v8
+          key=$reply
+          ;;
+        *)
+          TARGET_LABEL=ambiguous:$linux_user:$observed_uid:$base
+          join4 other "$linux_user" "$args" ambiguous
+          key=$reply
+          ;;
+      esac
+    elif [[ $args == \[*\] ]]; then
+      TARGET_KIND=kernel
+      TARGET_LABEL=$args
+      TARGET_CMD=${args#[}
+      TARGET_CMD=${TARGET_CMD%]}
+      join4 kernel "$args" v8 -
+      key=$reply
+    elif [[ $linux_user == root || $linux_user == system || $linux_user == shell ||
+            $linux_user == radio || $linux_user == bluetooth || $linux_user == media ]]; then
+      TARGET_KIND=global
+      TARGET_LABEL=$linux_user:$base
+      join4 global "$linux_user" "$base" v8
+      key=$reply
+    else
+      join4 other "$linux_user" "$args" v8
+      key=$reply
+    fi
+    valid_operand "$TARGET_CMD" || TARGET_CMD=-
+    TARGET_KEY=$key
+  }
+
+  # JOB[epoch,entity,tier] is represented by parallel scalar maps.
+  declare -A JOB_PHASE=() JOB_EPOCH=() JOB_ENTITY=() JOB_TIER=()
+  declare -A JOB_SNAPSHOT=() JOB_ATTEMPT=() JOB_READY=() JOB_SLOT=()
+  declare -A JOB_PID=() JOB_UID=() JOB_USER=() JOB_PKG=() JOB_CMD=()
+  declare -a JOB_KEYS=() QM=() QO=()
+  job_serial=0
+  qm_head=1
+  qm_tail=0
+  qo_head=1
+  qo_tail=0
+
+  job_key() {
+    join4 "$1" "$2" "$3" job_v2
+  }
+  job_unset() {
+    local key=$1 slot=${JOB_SLOT[$1]-}
+    case $slot in '') ;; *) unset 'JOB_KEYS[$slot]' ;; esac
+    unset 'JOB_PHASE[$key]' 'JOB_EPOCH[$key]' 'JOB_ENTITY[$key]' \
+      'JOB_TIER[$key]' 'JOB_SNAPSHOT[$key]' 'JOB_ATTEMPT[$key]' \
+      'JOB_READY[$key]' 'JOB_SLOT[$key]' 'JOB_PID[$key]' \
+      'JOB_UID[$key]' 'JOB_USER[$key]' 'JOB_PKG[$key]' 'JOB_CMD[$key]'
+  }
+  enqueue_job() {
+    local epoch=$1 entity=$2 tier=$3 snapshot=$4 key
+    job_key "$epoch" "$entity" "$tier"
+    key=$reply
+    case ${JOB_PHASE[$key]+set} in
+      set) reply=$key; return 0 ;;
+    esac
+    ((job_serial++))
+    JOB_KEYS[$job_serial]=$key
+    JOB_SLOT[$key]=$job_serial
+    JOB_PHASE[$key]=queued
+    JOB_EPOCH[$key]=$epoch
+    JOB_ENTITY[$key]=$entity
+    JOB_TIER[$key]=$tier
+    JOB_SNAPSHOT[$key]=$snapshot
+    JOB_ATTEMPT[$key]=0
+    JOB_READY[$key]=0
+    JOB_PID[$key]=${ENTITY_PID[$entity]-0}
+    JOB_UID[$key]=${ENTITY_UID[$entity]--}
+    JOB_USER[$key]=${ENTITY_USER[$entity]--}
+    JOB_PKG[$key]=${ENTITY_PKG[$entity]--}
+    JOB_CMD[$key]=${ENTITY_CMD[$entity]--}
+    case $tier in
+      H|L) ((qm_tail++)); QM[$qm_tail]=$key ;;
+      O) ((qo_tail++)); QO[$qo_tail]=$key ;;
+    esac
+    reply=$key
+  }
+  append_retry() {
+    local key=$1 tier=${JOB_TIER[$1]-}
+    case $tier in
+      H|L) ((qm_tail++)); QM[$qm_tail]=$key ;;
+      O) ((qo_tail++)); QO[$qo_tail]=$key ;;
+    esac
+  }
+  mandatory_exists() {
+    local key phase
+    for key in "${JOB_KEYS[@]}"; do
+      phase=${JOB_PHASE[$key]-absent}
+      case ${JOB_TIER[$key]-} in
+        H|L)
+          case $phase in queued|flight|retry_wait) return 0 ;; esac
+          ;;
+      esac
+    done
+    return 1
+  }
+  waiting_optional_exists() {
+    local key
+    for key in "${JOB_KEYS[@]}"; do
+      case ${JOB_TIER[$key]-}:${JOB_PHASE[$key]-} in
+        O:context_wait) return 0 ;;
+      esac
+    done
+    return 1
+  }
+  expire_terminal_jobs() {
+    local key phase
+    for key in "${JOB_KEYS[@]}"; do
+      phase=${JOB_PHASE[$key]-absent}
+      case $phase in
+        done|exhausted)
+          [[ ${JOB_EPOCH[$key]-} == "$profile_epoch" ]] || job_unset "$key"
+          ;;
+      esac
+    done
+  }
+  reset_jobs() {
+    JOB_PHASE=()
+    JOB_EPOCH=()
+    JOB_ENTITY=()
+    JOB_TIER=()
+    JOB_SNAPSHOT=()
+    JOB_ATTEMPT=()
+    JOB_READY=()
+    JOB_SLOT=()
+    JOB_PID=()
+    JOB_UID=()
+    JOB_USER=()
+    JOB_PKG=()
+    JOB_CMD=()
+    JOB_KEYS=()
+    QM=()
+    QO=()
+    job_serial=0
+    qm_head=1
+    qm_tail=0
+    qo_head=1
+    qo_tail=0
+  }
+  disclose_jobs() {
+    local why=$1 key phase body=$runtime/jobs_left_$RANDOM count=0 ee rc
+    : >"$body"
+    for key in "${JOB_KEYS[@]}"; do
+      phase=${JOB_PHASE[$key]-absent}
+      case $phase in
+        queued|flight|retry_wait|context_wait)
+          esc "${JOB_ENTITY[$key]-}"; ee=$reply
+          printf 'epoch=%s\tentity=%s\ttier=%s\tphase=%s\tattempt=%s\treason=%s\n' \
+            "${JOB_EPOCH[$key]-}" "$ee" "${JOB_TIER[$key]-}" "$phase" \
+            "${JOB_ATTEMPT[$key]-0}" "$why" >>"$body"
+          ((count++))
+          case ${JOB_TIER[$key]-} in
+            O) job_unset "$key" ;;
+            *) JOB_PHASE[$key]=done ;;
+          esac
+          ;;
+      esac
+    done
+    if ((count)); then
+      write_record JOBS_LEFT "$body" 0
+      rc=$?
+      rm -f -- "$body"
+      return "$rc"
+    fi
+    rm -f -- "$body"
+  }
+
+  build_config() {
+    local body=$1 row aliases var def parser help ev
+    {
+      printf 'version=8\timplementation=FULL_R13\tserial=%s\tadb_uid=%s\tboot_id=%s\tremote_writes=none\n' \
+        "$serial" "$adb_uid" "$boot_id"
+      printf 'top_fields=%s\truntime_staging=private\tpublic_txt=unique_noclobber_append_only\n' \
+        "$TOP_FIELDS"
+      for row in "${OPT[@]}"; do
+        IFS='|' read -r aliases var def parser help <<<"$row"
+        case $var in
+          -|help) continue ;;
+          top_extra) ev=${TOP_EXTRA[*]:-none} ;;
+          *) ev=${V[$var]} ;;
+        esac
+        esc "$ev"; ev=$reply
+        printf 'option=%s\tvalue=%s\n' "${aliases%%,*}" "$ev"
+      done
+      printf 'effective_source_timeout=%s\tsaver_caps=%s/%s/%s\tunattributable_binder_cpu=disclosed_not_estimated\n' \
+        "$effective_source_to" "$hour_cap" "$day_cap" "$total_cap"
+    } >"$body"
+  }
+
+  reset_daily_ids() {
+    state_serial=0
+    OCC_TOTAL=()
+    OCC_PENDING=()
+    OCC_ADDED=()
+    OCC_ORDER=()
+    clear_prev
+  }
+  start_cache() {
+    ((cache_serial++))
+    cache_dir=$runtime/cache_$cache_serial
+    mkdir -p -- "$cache_dir"
+  }
+  cache_end() {
+    local why=$1 reopen=${2-1} body=$runtime/cache_end_$RANDOM rc
+    flush_occurrences || return
+    printf 'hour=%s\treason=%s\tseen=%s\tadmission_closed=%s\tprevious_bytes=%s\n' \
+      "$out_hour" "$why" "$seen_count" "$admission_closed" "$prev_bytes" >"$body"
+    write_record CACHE_END "$body" 0 || {
+      rc=$?
+      rm -f -- "$body"
+      return "$rc"
+    }
+    rm -f -- "$body"
+    clear_prev
+    case $cache_dir in "$runtime"/cache_*) rm -rf -- "$cache_dir" ;; esac
+    cache_dir=
+    if ((reopen)); then start_cache; fi
+  }
+  open_day() {
+    local day=$1 hour=$2 stamp=$3 body=$runtime/config_$RANDOM rc
+    out_day=$day
+    out_hour=$hour
+    record_seq=0
+    file_bytes=0
+    day_bytes=0
+    o_day_bytes=0
+    hour_bytes=0
+    o_hour_bytes=0
+    unique_open "$stamp" || { set_reason create_error; return 1; }
+    reset_daily_ids
+    start_cache || { set_reason cache_error; return 1; }
+    capture_inventory
+    build_config "$body" || return
+    write_record CONFIG "$body" 0 || {
+      rc=$?
+      rm -f -- "$body"
+      return "$rc"
+    }
+    rm -f -- "$body"
+    write_record INVENTORY "$inventory_file" 0 || return
+    case $refresh in
+      hourly) profile_epoch=$hour ;;
+      daily) profile_epoch=$day ;;
+      off) profile_epoch=$invocation_epoch ;;
+    esac
+    context_due=$context
+    context_attempt=0
+    context_epoch_done=
+    o_refresh_due=0
+    printf 'Writing %s\n' "$file"
+  }
+
+  # Runtime engine.
+  pid_cpu_ticks() {
+    local p=$1 tail
+    host_stat_for_namespace_pid "$p" || { reply=0; return 1; }
+    tail=${HOST_PROC_STAT##*) }
+    set -- $tail
+    (($# >= 15)) || { reply=0; return 1; }
+    reply=$((${12} + ${13} + ${14} + ${15}))
+  }
+  wait_pid_note() {
+    local note=$1 keep=${2-0} i p s
+    reply=
+    reply2=
+    for ((i=0; i<200; i++)); do
+      if [[ -r $note ]]; then
+        read -r p s <"$note"
+        if [[ $p =~ ^[1-9][0-9]*$ && $s =~ ^[0-9]+$ ]]; then
+          pid_start_local "$p"
+          if [[ $reply == "$s" ]]; then
+            ((keep)) || rm -f -- "$note"
+            reply=$p
+            reply2=$s
+            return 0
+          fi
+        fi
+      fi
+      sleep 0.01
+    done
+    return 1
+  }
+  worker_child_tuple() {
+    local p s
+    [[ -n $worker_child_note && -r $worker_child_note ]] || return 1
+    read -r p s <"$worker_child_note"
+    [[ $p =~ ^[1-9][0-9]*$ && $s =~ ^[0-9]+$ ]] || return 1
+    pid_start_local "$p" || return 1
+    [[ $reply == "$s" ]] || return 1
+    reply=$p
+    reply2=$s
+  }
+  stop_worker_child() {
+    worker_child_tuple || return 0
+    stop_owned_local "$reply" "$reply2"
+  }
+  profiler_pid() {
+    local p=$1
+    if [[ $p == "$remote_top_pid" && $source_owner_seen == 1 &&
+          $remote_top_start =~ ^[0-9]+$ ]]; then
+      return 0
+    fi
+    [[ -n $capture_remote_pid && $p == "$capture_remote_pid" ]]
+  }
+  snapshot_capture_helpers() {
+    local f first
+    capture_remote_pid=
+    worker_child_tuple || return 0
+    [[ -n $worker_stage && -d $worker_stage ]] || return 1
+    for f in "$worker_stage"/*.part; do
+      [[ -r $f ]] || continue
+      first=
+      IFS= read -r first <"$f"
+      if [[ $first =~ ^V8_HELPER_OWNER[[:space:]]+([1-9][0-9]*)[[:space:]]+[0-9]+$ ]]; then
+        capture_remote_pid=${BASH_REMATCH[1]}
+        break
+      fi
+    done
+    return 0
+  }
+
+  read -r -d '' REMOTE_RECIPE <<'V8_REMOTE_RECIPE'
+guard=$1
+recipe=$2
+pid=$3
+user=$4
+pkg=$5
+operand=$6
+cap=$7
+expected=$8
+expected_uid=$9
+expected_cmd=${10}
+actual=$(id -u 2>/dev/null)
+if printf '%s\n' "$actual" | grep -Eq '^[0-9]+$'; then
+  :
+else
+  printf 'V8_TERMINAL UID_NONNUMERIC\n'
+  exit 46
+fi
+case $guard in
+  any) ;;
+  *)
+    if [ "$actual" = "$guard" ]; then
+      :
+    else
+      printf 'V8_TERMINAL UID_GUARD actual=%s required=%s\n' "$actual" "$guard"
+      exit 46
+    fi
+    ;;
+esac
+helper_start=$(
+  s=$(cat "/proc/$$/stat" 2>/dev/null)
+  tail=${s##*) }
+  set -- $tail
+  [ "$#" -ge 20 ] || exit 45
+  printf '%s\n' "${20}"
+) || exit 45
+printf 'V8_HELPER_OWNER %s %s\n' "$$" "$helper_start"
+if printf '%s\n' "$cap" | grep -Eq '^[0-9]+$'; then
+  :
+else
+  exit 64
+fi
+limit=$((cap + 1))
+package_projection() {
+  component=$1
+  pkg_re=$(printf '%s\n' "$pkg" | sed 's/[.]/[.]/g')
+  pattern="(^|[^A-Za-z0-9_.])${pkg_re}([^A-Za-z0-9_.]|$)"
+  if printf '%s\n' "$expected_uid" | grep -Eq '^[0-9]+$'; then
+    pattern="${pattern}|(^|[^0-9])${expected_uid}([^0-9]|$)"
+  fi
+  {
+    printf 'V8_PACKAGE_PROJECTION_BEGIN component=%s package=%s uid=%s cap=%s before=4 after=24\n' \
+      "$component" "$pkg" "$expected_uid" "$cap"
+    case $component in
+      JOBS)
+        dumpsys jobscheduler 2>&1 |
+          grep -E -B 4 -A 24 "$pattern"
+        ;;
+      PROVIDERS)
+        dumpsys activity providers 2>&1 |
+          grep -E -B 4 -A 24 "$pattern"
+        ;;
+      *) exit 64 ;;
+    esac
+    printf 'V8_PACKAGE_PROJECTION_END component=%s\n' "$component"
+  } | head -c "$limit"
+}
+case $recipe in
+  identity)
+    if [ -r "/proc/$pid/stat" ] && [ -r "/proc/$pid/status" ]; then
+      :
+    else
+      printf 'V8_TERMINAL PID_GONE\n'
+      exit 44
+    fi
+    s=$(cat "/proc/$pid/stat" 2>/dev/null) || exit 44
+    tail=${s##*) }
+    set -- $tail
+    [ "$#" -ge 20 ] || exit 45
+    start=${20}
+    case $expected in
+      0) ;;
+      *)
+        if [ "$start" = "$expected" ]; then
+          :
+        else
+          printf 'V8_TERMINAL PID_CHANGED\n'
+          exit 47
+        fi
+        ;;
+    esac
+    status_uid=$(awk '/^Uid:/ {print $2; exit}' "/proc/$pid/status" 2>/dev/null)
+    if printf '%s\n' "$status_uid" | grep -Eq '^[0-9]+$'; then
+      :
+    else
+      printf 'V8_TERMINAL PID_UID_UNKNOWN\n'
+      exit 47
+    fi
+    case $expected_uid in
+      -) ;;
+      *)
+        if [ "$status_uid" = "$expected_uid" ]; then
+          :
+        else
+          printf 'V8_TERMINAL PID_UID_CHANGED\n'
+          exit 47
+        fi
+        ;;
+    esac
+    cmdline=$(tr '\000' '\n' <"/proc/$pid/cmdline" 2>/dev/null | head -n 1)
+    comm=$(cat "/proc/$pid/comm" 2>/dev/null)
+    base=${cmdline##*/}
+    case $pkg in
+      -) ;;
+      *)
+        case $cmdline in
+          "$pkg"|"$pkg":*|"$expected_cmd") ;;
+          *) printf 'V8_TERMINAL PID_CMD_CHANGED\n'; exit 47 ;;
+        esac
+        ;;
+    esac
+    case $expected_cmd in
+      -|'') ;;
+      "$cmdline"|"$comm"|"$base") ;;
+      *) printf 'V8_TERMINAL PID_CMD_CHANGED\n'; exit 47 ;;
+    esac
+    printf 'V8_IDENTITY %s %s\n' "$start" "$status_uid" | head -c "$limit"
+    ;;
+  proc_file)
+    head -c "$limit" "/proc/$pid/$operand" 2>&1
+    ;;
+  ps_threads)
+    {
+      printf 'V8_THREADS_PS pid=%s\n' "$pid"
+      ps -T -p "$pid" -o PID,TID,UID,PR,NI,S,%CPU,%MEM,NAME 2>&1
+      printf 'V8_THREADS_PROC_COMM pid=%s\n' "$pid"
+      for d in "/proc/$pid/task/"[0-9]*; do
+        [ -d "$d" ] || continue
+        tid=${d##*/}
+        comm=$(cat "$d/comm" 2>/dev/null) || continue
+        s=$(cat "$d/stat" 2>/dev/null) || continue
+        tail=${s##*) }
+        set -- $tail
+        [ "$#" -ge 17 ] || continue
+        printf 'tid=%s\tcomm=%s\tstate=%s\tutime=%s\tstime=%s\tpr=%s\tni=%s\n' \
+          "$tid" "$comm" "$1" "${12}" "${13}" "${16}" "${17}"
+      done
+    } | head -c "$limit"
+    ;;
+  dumpsys_package)
+    dumpsys package "$pkg" 2>&1 | head -c "$limit"
+    ;;
+  appops)
+    cmd appops get --user "$user" "$pkg" 2>&1 | head -c "$limit"
+    ;;
+  dumpsys_pkg)
+    case $operand in
+      activity_services) dumpsys activity services "$pkg" 2>&1 | head -c "$limit" ;;
+      batterystats) dumpsys batterystats "$pkg" 2>&1 | head -c "$limit" ;;
+      *) exit 64 ;;
+    esac
+    ;;
+  pkg_projection)
+    case $operand in
+      jobscheduler) package_projection JOBS ;;
+      activity_providers) package_projection PROVIDERS ;;
+      *) exit 64 ;;
+    esac
+    ;;
+  local_window)
+    dumpsys "$operand" 2>&1 | grep -F -B 2 -A 12 "$pkg" | head -c "$limit"
+    ;;
+  dumpsys_pid)
+    dumpsys "$operand" "$pid" 2>&1 | head -c "$limit"
+    ;;
+  local_window_pid)
+    dumpsys "$operand" 2>&1 | grep -F -B 2 -A 6 "$pid" | head -c "$limit"
+    ;;
+  fixed_file)
+    head -c "$limit" "$operand" 2>&1
+    ;;
+  dumpsys_fixed)
+    dumpsys "$operand" 2>&1 | head -c "$limit"
+    ;;
+  power_supply)
+    for d in /sys/class/power_supply/*; do
+      [ -d "$d" ] || continue
+      for f in type online status health capacity current_now current_avg \
+        voltage_now power_now charge_counter temp cycle_count; do
+        [ -r "$d/$f" ] || continue
+        printf '%s=' "$d/$f"
+        cat "$d/$f" 2>&1
+      done
+    done | head -c "$limit"
+    ;;
+  projection)
+    case $operand in
+      power)
+        dumpsys power 2>&1 |
+          grep -i -E 'Wakefulness=|mWakefulness=|mScreenOn=|Display Power|Wake Locks|WAKE_LOCK' |
+          head -c "$limit"
+        ;;
+      display)
+        dumpsys display 2>&1 |
+          grep -i -E 'mGlobalDisplayState|Display Power State|mScreenState|state=|mBrightness' |
+          head -c "$limit"
+        ;;
+      activities)
+        dumpsys activity activities 2>&1 |
+          grep -i -E 'mResumedActivity|topResumedActivity|mFocusedApp|visible=true|state=RESUMED' |
+          head -c "$limit"
+        ;;
+      window)
+        dumpsys window windows 2>&1 |
+          grep -i -E 'mCurrentFocus|mFocusedApp|mTopFocusedDisplayId' |
+          head -c "$limit"
+        ;;
+      telecom)
+        dumpsys telecom 2>&1 |
+          grep -i -E 'mIsInCall[=: ]+true|isInCall[=: ]+true|foregroundCall.*(ACTIVE|DIALING|RINGING|CONNECTING)|CallAudio.*(ACTIVE|ROUTE)|AudioRoute.*(ACTIVE|ROUTE)' |
+          head -c "$limit"
+        ;;
+      audio)
+        dumpsys audio 2>&1 |
+          grep -i -E 'mode:.*MODE_(IN_CALL|IN_COMMUNICATION)|AudioFocus.*(gain|active)|record(ing)?.*(active|start)|active.*(record|capture)' |
+          head -c "$limit"
+        ;;
+      network)
+        {
+          cat /proc/net/dev 2>&1
+          dumpsys connectivity 2>&1 |
+            grep -i -E 'Default network|VALIDATED|CAPTIVE_PORTAL|NetworkAgentInfo|Keepalive'
+        } | head -c "$limit"
+        ;;
+      *) exit 64 ;;
+    esac
+    ;;
+  pressure)
+    for f in cpu memory io; do
+      printf '%s\n' "--- PSI_$f"
+      cat "/proc/pressure/$f" 2>&1
+    done | head -c "$limit"
+    ;;
+  logcat)
+    {
+      printf '%s\n' logcatinfostart
+      logcat -b all -d -t 256 -v threadtime 2>&1
+      printf '\n%s\n' logcatinfoend
+    } | head -c "$limit"
+    ;;
+  *) exit 64 ;;
+esac
+V8_REMOTE_RECIPE
+
+  declare -A B_JOB=() B_PID=() B_DEPTH=() B_USER=() B_PKG=()
+  declare -A B_UID=() B_CMD=()
+  batch_serial=0
+  worker_class=
+  worker_include_context=0
+  worker_started_ms=0
+
+  worker_capture_component() {
+    local dst=$1 cap=$2 recipe=$3 pid=$4 user=$5 pkg=$6 operand=$7
+    local expected=$8 expected_uid=$9 expected_cmd=${10}
+    local part=$dst.part clean=$dst.clean rc n quality child child_start first skip
+    coproc V8_COMPONENT {
+      exec timeout -k 2s "${diag_to}s" "${A[@]}" shell -T sh -s \
+        "$shell_uid" "$recipe" "$pid" "$user" "$pkg" "$operand" "$cap" \
+        "$expected" "$expected_uid" "$expected_cmd" <<<"$REMOTE_RECIPE"
+    } >"$part" 2>&1
+    child=${V8_COMPONENT_PID-}
+    case ${V8_COMPONENT[0]-} in '') ;; *) exec {V8_COMPONENT[0]}<&- ;; esac
+    case ${V8_COMPONENT[1]-} in '') ;; *) exec {V8_COMPONENT[1]}>&- ;; esac
+    rc=125
+    if [[ $child =~ ^[1-9][0-9]*$ ]]; then
+      pid_start_local "$child"
+      if (($? == 0)); then
+        child_start=$reply
+        if printf '%s %s\n' "$child" "$child_start" \
+             >"$worker_child_note.part" &&
+           mv -- "$worker_child_note.part" "$worker_child_note"; then
+          wait "$child"
+          rc=$?
+        else
+          stop_owned_local "$child" "$child_start"
+        fi
+      else
+        wait "$child"
+        rc=$?
+      fi
+    fi
+    rm -f -- "$worker_child_note" "$worker_child_note.part"
+    first=
+    IFS= read -r first <"$part"
+    if [[ $first =~ ^V8_HELPER_OWNER[[:space:]]+([1-9][0-9]*)[[:space:]]+([0-9]+)$ ]]; then
+      skip=$((${#first} + 1))
+      dd if="$part" of="$clean" bs=1 skip="$skip" status=none &&
+        mv -- "$clean" "$part"
+    fi
+    bytes_file "$part" || reply=0
+    n=$reply
+    quality=complete
+    ((rc == 0)) || quality=incomplete
+    if ((n > cap)); then
+      head -c "$cap" -- "$part" >"$dst"
+      quality=truncated
+      rm -f -- "$part"
+    else
+      mv -- "$part" "$dst"
+    fi
+    printf '%s\t%s\n' "$rc" "$quality" >"$dst.meta"
+  }
+  worker_main() {
+    local i key pid depth user pkg uid cmd row scope need comp cap gate recipe operand
+    local ci rc quality start got_uid pre post target_quality
+    for ((i=1; i<=worker_count; i++)); do
+      key=${B_JOB[$i]}
+      pid=${B_PID[$i]}
+      depth=${B_DEPTH[$i]}
+      user=${B_USER[$i]}
+      pkg=${B_PKG[$i]}
+      uid=${B_UID[$i]}
+      cmd=${B_CMD[$i]}
+      pre=$worker_stage/pre_$i.raw
+      worker_capture_component "$pre" 65536 identity "$pid" "$user" "$pkg" - \
+        0 "$uid" "$cmd"
+      read -r _ start got_uid < <(awk '/^V8_IDENTITY [0-9]+ [0-9]+$/ {print; exit}' "$pre")
+      if [[ $start =~ ^[0-9]+$ && $got_uid == "$uid" ]]; then
+        target_quality=complete
+      else
+        target_quality=terminal
+      fi
+      ci=0
+      : >"$worker_stage/target_$i.tsv"
+      if [[ $target_quality == complete ]]; then
+        for row in "${CAPTURE[@]}"; do
+          IFS='|' read -r scope need comp cap gate recipe operand <<<"$row"
+          case $scope in proc|pkg|deep) ;; *) continue ;; esac
+          ((depth >= need)) || continue
+          case $gate in
+            packages) ((packages)) || continue ;;
+          esac
+          case $scope:$pkg in pkg:-) continue ;; esac
+          ((ci++))
+          worker_capture_component "$worker_stage/t_${i}_${ci}.raw" "$cap" \
+            "$recipe" "$pid" "$user" "$pkg" "$operand" "$start" "$uid" "$cmd"
+          read -r rc quality <"$worker_stage/t_${i}_${ci}.raw.meta"
+          printf '%s\t%s\t%s\t%s\n' "$ci" "$comp" "$rc" "$quality" \
+            >>"$worker_stage/target_$i.tsv"
+          case $quality in incomplete) target_quality=incomplete ;; esac
+        done
+        post=$worker_stage/post_$i.raw
+        worker_capture_component "$post" 65536 identity "$pid" "$user" "$pkg" - \
+          "$start" "$uid" "$cmd"
+        if grep -q "^V8_IDENTITY $start $uid$" "$post"; then
+          :
+        else
+          target_quality=terminal
+        fi
+      fi
+      printf '%s\t%s\n' "$target_quality" "${start:-0}" \
+        >"$worker_stage/target_$i.status"
+    done
+    if ((worker_include_context)); then
+      ci=0
+      : >"$worker_stage/context.tsv"
+      printf '%s\n' complete >"$worker_stage/context.status"
+      for row in "${CAPTURE[@]}"; do
+        IFS='|' read -r scope need comp cap gate recipe operand <<<"$row"
+        [[ $scope == ctx ]] || continue
+        case $gate in
+          context) ((context)) || continue ;;
+          logcat) ((with_logcat)) || continue ;;
+        esac
+        ((ci++))
+        worker_capture_component "$worker_stage/c_${ci}.raw" "$cap" \
+          "$recipe" 0 0 - "$operand" 0 - -
+        read -r rc quality <"$worker_stage/c_${ci}.raw.meta"
+        printf '%s\t%s\t%s\t%s\n' "$ci" "$comp" "$rc" "$quality" \
+          >>"$worker_stage/context.tsv"
+        case $quality in
+          complete) ;;
+          incomplete) printf '%s\n' incomplete >"$worker_stage/context.status" ;;
+          *)
+            case $(<"$worker_stage/context.status") in
+              complete) printf '%s\n' "$quality" >"$worker_stage/context.status" ;;
+            esac
+            ;;
+        esac
+      done
+    fi
+  }
+  queue_pop() {
+    local class=$1 key now=$(date +%s)
+    reply=
+    case $class in
+      M)
+        while ((qm_head <= qm_tail)); do
+          key=${QM[$qm_head]-}
+          unset 'QM[$qm_head]'
+          ((qm_head++))
+          [[ ${JOB_PHASE[$key]-} == queued ]] || continue
+          if (( ${JOB_READY[$key]-0} > now )); then
+            ((qm_tail++))
+            QM[$qm_tail]=$key
+            continue
+          fi
+          reply=$key
+          return 0
+        done
+        ;;
+      O)
+        while ((qo_head <= qo_tail)); do
+          key=${QO[$qo_head]-}
+          unset 'QO[$qo_head]'
+          ((qo_head++))
+          [[ ${JOB_PHASE[$key]-} == queued ]] || continue
+          reply=$key
+          return 0
+        done
+        ;;
+    esac
+    return 1
+  }
+  prepare_retries() {
+    local key now=$(date +%s)
+    for key in "${JOB_KEYS[@]}"; do
+      [[ ${JOB_PHASE[$key]-} == retry_wait ]] || continue
+      (( ${JOB_READY[$key]-0} <= now )) || continue
+      JOB_PHASE[$key]=queued
+      append_retry "$key"
+    done
+  }
+  active_fresh() {
+    local now=$(date +%s)
+    ((active_at > 0 && now >= active_at && now - active_at <= context_ttl))
+  }
+  entity_active() {
+    local entity=$1 pid=${2-${ENTITY_PID[$1]-0}} uid=${3-${ENTITY_UID[$1]--}}
+    local user=${4-${ENTITY_USER[$1]--}} pkg=${5-${ENTITY_PKG[$1]--}}
+    local label=${ENTITY_LABEL[$entity]-} pair
+    [[ $label =~ $allow ]] && return 0
+    case $pid in
+      ''|0|-) ;;
+      *) [[ ${ACTIVE[pid:$pid]-0} == 1 ]] && return 0 ;;
+    esac
+    case $uid in
+      ''|-) ;;
+      *) [[ ${ACTIVE[uid:$uid]-0} == 1 ]] && return 0 ;;
+    esac
+    case $user:$pkg in
+      *:-|*:) ;;
+      *)
+        pair=$user$'\x1f'$pkg
+        [[ ${ACTIVE[upkg:$pair]-0} == 1 ]] && return 0
+        ;;
+    esac
+    return 1
+  }
+  o_target_gate() {
+    local key=$1 entity=${JOB_ENTITY[$1]-} now=$((SECONDS * 1000))
+    decay "$now"
+    ((watch && context && budget > 0)) || return 1
+    saver_open || return 1
+    active_fresh || return 2
+    entity_active "$entity" "${JOB_PID[$key]-0}" "${JOB_UID[$key]--}" \
+      "${JOB_USER[$key]--}" "${JOB_PKG[$key]--}" && return 1
+    mandatory_exists && return 3
+    ((duty_debt == 0)) || return 3
+    return 0
+  }
+  resolve_o_candidates() {
+    local quality=$1 key gate
+    o_refresh_due=0
+    for key in "${JOB_KEYS[@]}"; do
+      case ${JOB_TIER[$key]-}:${JOB_PHASE[$key]-} in
+        O:context_wait) ;;
+        *) continue ;;
+      esac
+      case $quality in
+        complete)
+          o_target_gate "$key"
+          gate=$?
+          case $gate in
+            0|3)
+              JOB_PHASE[$key]=queued
+              append_retry "$key"
+              ;;
+            2) o_refresh_due=1 ;;
+            *) job_unset "$key" ;;
+          esac
+          ;;
+        *)
+          job_unset "$key"
+          ;;
+      esac
+    done
+  }
+  launch_worker() {
+    local class= key entity i=0 gate context_mode=none
+    [[ -z $worker_pid ]] || return 0
+    prepare_retries
+    if mandatory_exists; then
+      class=M
+    elif ((context_due)); then
+      class=M
+      context_mode=mandatory
+    elif ((o_refresh_due)); then
+      waiting_optional_exists || { o_refresh_due=0; return 0; }
+      ((watch && context && budget > 0)) || {
+        resolve_o_candidates canceled
+        return 0
+      }
+      observer_open || {
+        saver_open || resolve_o_candidates canceled
+        return 0
+      }
+      class=O
+      context_mode=optional
+    else
+      class=O
+      observer_open || return 0
+    fi
+    ((batch_serial++))
+    worker_stage=$runtime/worker_$batch_serial
+    mkdir -p -- "$worker_stage" || return 1
+    worker_class=$class
+    worker_context_mode=$context_mode
+    worker_include_context=0
+    case $context_mode in mandatory|optional) worker_include_context=1 ;; esac
+    if [[ $context_mode == none ]]; then
+      while ((i < batch_cap)); do
+        queue_pop "$class" || break
+        key=$reply
+        if [[ $class == O ]]; then
+          o_target_gate "$key"
+          gate=$?
+          case $gate in
+            0) ;;
+            1) job_unset "$key"; continue ;;
+            2)
+              JOB_PHASE[$key]=context_wait
+              o_refresh_due=1
+              continue
+              ;;
+            *)
+              append_retry "$key"
+              break
+              ;;
+          esac
+        fi
+        entity=${JOB_ENTITY[$key]}
+        ((i++))
+        B_JOB[$i]=$key
+        B_PID[$i]=${JOB_PID[$key]-0}
+        case ${JOB_TIER[$key]} in H|O) B_DEPTH[$i]=2 ;; *) B_DEPTH[$i]=1 ;; esac
+        B_USER[$i]=${JOB_USER[$key]--}
+        B_PKG[$i]=${JOB_PKG[$key]--}
+        B_UID[$i]=${JOB_UID[$key]--}
+        B_CMD[$i]=${JOB_CMD[$key]--}
+        JOB_PHASE[$key]=flight
+      done
+    fi
+    worker_count=$i
+    if ((worker_count == 0 && worker_include_context == 0)); then
+      rmdir -- "$worker_stage" 2>/dev/null
+      worker_stage=
+      return 0
+    fi
+    worker_started_ms=$((SECONDS * 1000))
+    worker_child_note=$worker_stage/ACTIVE_CHILD
+    cpu_ticks_self
+    worker_ctrl_start=$reply
+    worker_source_cpu_start=0
+    worker_source_cpu_tuple=
+    if [[ $source_pid =~ ^[1-9][0-9]*$ ]]; then
+      pid_start_local "$source_pid"
+      if [[ $reply == "$source_start" ]]; then
+        pid_cpu_ticks "$source_pid"
+        worker_source_cpu_start=$reply
+        worker_source_cpu_tuple=$source_pid:$source_start
+      fi
+    fi
+    coproc V8_WORKER {
+      worker_main
+      rc=$?
+      pid_cpu_ticks "$BASHPID"
+      printf '%s\n' "$reply" >"$worker_stage/CPU_TICKS.part"
+      mv -- "$worker_stage/CPU_TICKS.part" "$worker_stage/CPU_TICKS"
+      printf '%s\n' "$rc" >"$worker_stage/exit.part"
+      mv -- "$worker_stage/exit.part" "$worker_stage/READY"
+      exit "$rc"
+    } >/dev/null 2>&1
+    worker_pid=${V8_WORKER_PID-}
+    case ${V8_WORKER[0]-} in '') ;; *) exec {V8_WORKER[0]}<&- ;; esac
+    case ${V8_WORKER[1]-} in '') ;; *) exec {V8_WORKER[1]}>&- ;; esac
+    if [[ $worker_pid =~ ^[1-9][0-9]*$ ]]; then
+      pid_start_local "$worker_pid"
+    else
+      reply=
+    fi
+    if [[ $reply =~ ^[0-9]+$ ]]; then
+      worker_start=$reply
+    else
+      case $worker_pid in
+        [1-9][0-9]*) wait "$worker_pid" 2>/dev/null ;;
+      esac
+      worker_pid=
+      return 125
+    fi
+    owned_add "$worker_pid" "$worker_start" || {
+      stop_owned_local "$worker_pid" "$worker_start"
+      worker_pid=
+      return 125
+    }
+    worker_deadline=$((SECONDS + diag_to * (worker_count * 23 + worker_include_context * 12 + 2)))
+  }
+  finish_worker_budget() {
+    local end_ms=$1 worker_ticks=${2-0} controller_now controller_delta=0
+    local source_now source_delta=0 ticks elapsed
+    [[ $worker_ticks =~ ^[0-9]+$ ]] || worker_ticks=0
+    cpu_ticks_self
+    controller_now=$reply
+    if [[ $controller_now =~ ^[0-9]+$ ]] &&
+         ((controller_now >= worker_ctrl_start)); then
+      controller_delta=$((controller_now - worker_ctrl_start))
+    fi
+    ((worker_ticks > controller_delta)) && controller_delta=$worker_ticks
+    if [[ $worker_source_cpu_tuple == "$source_pid:$source_start" ]]; then
+      pid_start_local "$source_pid"
+      if [[ $reply == "$source_start" ]]; then
+        pid_cpu_ticks "$source_pid"
+        source_now=$reply
+        if [[ $source_now =~ ^[0-9]+$ ]] &&
+             ((source_now >= worker_source_cpu_start)); then
+          source_delta=$((source_now - worker_source_cpu_start))
+        fi
+      fi
+    fi
+    ticks=$((controller_delta + source_delta))
+    reply=$(((ticks * 1000 + local_clk - 1) / local_clk))
+    elapsed=$((end_ms - worker_started_ms))
+    ((elapsed < 0)) && elapsed=0
+    ((reply < elapsed)) && reply=$elapsed
+    finish_observer_interval "$worker_started_ms" "$end_ms" "$reply"
+  }
+  consume_manifest() {
+    local manifest=$1 prefix=$2 domain=$3 owner=$4 charge=$5
+    local ci comp rc quality raw chain sid
+    REFS=
+    MANIFEST_COMPLETE=1
+    while IFS=$'\t' read -r ci comp rc quality; do
+      raw=$worker_stage/${prefix}_${ci}.raw
+      [[ -f $raw ]] || { MANIFEST_COMPLETE=0; continue; }
+      join4 "$domain" "$owner" "$comp" "v1_$quality"
+      chain=$reply
+      commit_state "$domain" "$chain" "$raw" \
+        "transport_rc=$rc quality=$quality" 1 "$charge" 1 || return
+      sid=$COMMIT_ID
+      REFS+="${REFS:+ }$comp=$sid"
+      case $quality in incomplete) MANIFEST_COMPLETE=0 ;; esac
+    done <"$manifest"
+  }
+  refresh_active() {
+    local manifest=$1 ci comp rc quality raw value key screen=unknown pair puser ppkg
+    local -A fresh=()
+    local -a fresh_keys=()
+    while IFS=$'\t' read -r ci comp rc quality; do
+      raw=$worker_stage/c_${ci}.raw
+      [[ -f $raw ]] || continue
+      case $comp in
+        POWER|DISPLAY)
+          if grep -Eiq 'Wakefulness=(Asleep|Dozing)|mWakefulness=(Asleep|Dozing)|mScreenOn=false|state=OFF|mScreenState=OFF' "$raw"; then
+            screen=off
+          else
+            case $screen in
+              off) ;;
+              *)
+                if grep -Eiq 'Wakefulness=Awake|mWakefulness=Awake|mScreenOn=true|state=ON|mScreenState=ON' "$raw"; then
+                  screen=on
+                fi
+                ;;
+            esac
+          fi
+          ;;
+      esac
+    done <"$manifest"
+    while IFS=$'\t' read -r ci comp rc quality; do
+      raw=$worker_stage/c_${ci}.raw
+      [[ -f $raw ]] || continue
+      case $comp in
+        TELECOM|AUDIO) ;;
+        ACTIVITIES|WINDOW) [[ $screen == on ]] || continue ;;
+        *) continue ;;
+      esac
+      while IFS= read -r value; do
+        case $value in
+          pkg:*)
+            value=${value#pkg:}
+            valid_pkg "$value" || continue
+            for pair in "${PKG_PAIRS[@]}"; do
+              IFS=$'\x1f' read -r puser ppkg <<<"$pair"
+              [[ $ppkg == "$value" ]] || continue
+              key=upkg:$pair
+              case ${fresh[$key]+set} in
+                set) ;;
+                *) fresh_keys+=("$key") ;;
+              esac
+              fresh[$key]=1
+            done
+            ;;
+          pid:*)
+            value=${value#pid:}
+            [[ $value =~ ^[1-9][0-9]*$ ]] || continue
+            key=pid:$value
+            case ${fresh[$key]+set} in set) ;; *) fresh_keys+=("$key") ;; esac
+            fresh[$key]=1
+            ;;
+          uid:*)
+            value=${value#uid:}
+            [[ $value =~ ^[0-9]+$ ]] || continue
+            key=uid:$value
+            case ${fresh[$key]+set} in set) ;; *) fresh_keys+=("$key") ;; esac
+            fresh[$key]=1
+            ;;
+        esac
+      done < <(awk '{
+        s=$0
+        while (match(s,/[A-Za-z0-9_]+([.][A-Za-z0-9_]+)+/)) {
+          print "pkg:" substr(s,RSTART,RLENGTH)
+          s=substr(s,RSTART+RLENGTH)
+        }
+        s=$0
+        while (match(s,/(pid|PID|Pid)[=: ][[:space:]]*[0-9]+/)) {
+          x=substr(s,RSTART,RLENGTH)
+          sub(/[^0-9]*/,"",x)
+          print "pid:" x
+          s=substr(s,RSTART+RLENGTH)
+        }
+        s=$0
+        while (match(s,/(uid|UID|Uid)[=: ][[:space:]]*[0-9]+/)) {
+          x=substr(s,RSTART,RLENGTH)
+          sub(/[^0-9]*/,"",x)
+          print "uid:" x
+          s=substr(s,RSTART+RLENGTH)
+        }
+      }' "$raw")
+    done <"$manifest"
+    ACTIVE=()
+    for key in "${fresh_keys[@]}"; do ACTIVE[$key]=1; done
+    active_at=$(date +%s)
+  }
+  reap_worker() {
+    local i key tier quality start entity charge=0 body refs now_ms worker_ticks
+    local finished_worker
+    local snap done_epoch done_stamp done_day done_hour done_iso escaped_iso escaped_request
+    [[ -n $worker_pid && -f $worker_stage/READY ]] || return 0
+    finished_worker=$worker_pid
+    wait "$finished_worker" 2>/dev/null
+    owned_remove "$finished_worker"
+    worker_pid=
+    now_ms=$((SECONDS * 1000))
+    if [[ -r $worker_stage/CPU_TICKS ]]; then
+      worker_ticks=$(<"$worker_stage/CPU_TICKS")
+    else
+      worker_ticks=0
+    fi
+    finish_worker_budget "$now_ms" "$worker_ticks"
+    snap=$(clock_snapshot)
+    IFS='|' read -r done_epoch done_stamp done_day done_hour done_iso <<<"$snap"
+    esc "$done_iso"; escaped_iso=$reply
+    [[ $worker_class == O ]] && charge=1
+    if ((worker_include_context)) && [[ -f $worker_stage/context.tsv ]]; then
+      quality=$(<"$worker_stage/context.status")
+      case $quality in complete) refresh_active "$worker_stage/context.tsv" ;; esac
+      consume_manifest "$worker_stage/context.tsv" c context device "$charge" || return
+      refs=$REFS
+      body="epoch=$profile_epoch completed=$escaped_iso mode=$worker_context_mode quality=$quality states={$refs}"
+      text_record CONTEXT "$body" "$charge" || return
+      case $worker_context_mode:$quality in
+        mandatory:complete)
+          context_due=0
+          context_attempt=0
+          context_epoch_done=$profile_epoch
+          ;;
+        mandatory:*)
+          if ((context_attempt == 0)); then
+            context_attempt=1
+            context_due=1
+          else
+            context_due=0
+          fi
+          ;;
+        optional:*) ;;
+      esac
+      if waiting_optional_exists; then
+        resolve_o_candidates "$quality"
+      else
+        o_refresh_due=0
+      fi
+    fi
+    for ((i=1; i<=worker_count; i++)); do
+      key=${B_JOB[$i]-}
+      [[ -n $key ]] || continue
+      read -r quality start <"$worker_stage/target_$i.status"
+      entity=${JOB_ENTITY[$key]}
+      tier=${JOB_TIER[$key]}
+      refs=
+      if [[ -f $worker_stage/target_$i.tsv ]]; then
+        consume_manifest "$worker_stage/target_$i.tsv" "t_${i}" probe "$entity" \
+          "$charge" || return
+        refs=$REFS
+        ((MANIFEST_COMPLETE)) || quality=incomplete
+      fi
+      esc "$entity"
+      entity=$reply
+      esc "${JOB_SNAPSHOT[$key]-}"; escaped_request=$reply
+      body="epoch=${JOB_EPOCH[$key]} completed=$escaped_iso entity=$entity tier=$tier quality=$quality pid=${B_PID[$i]} uid=${B_UID[$i]} start=$start requested={$escaped_request} states={$refs}"
+      text_record PROBE "$body" "$charge" || return
+      case $tier:$quality in
+        O:*) job_unset "$key" ;;
+        *:terminal) job_unset "$key" ;;
+        *:incomplete)
+          if (( ${JOB_ATTEMPT[$key]-0} == 0 )); then
+            JOB_ATTEMPT[$key]=1
+            JOB_PHASE[$key]=retry_wait
+            JOB_READY[$key]=$(( $(date +%s) + 2 ))
+          else
+            JOB_PHASE[$key]=exhausted
+          fi
+          ;;
+        *) JOB_PHASE[$key]=done ;;
+      esac
+      unset 'B_JOB[$i]' 'B_PID[$i]' 'B_DEPTH[$i]' 'B_USER[$i]' \
+        'B_PKG[$i]' 'B_UID[$i]' 'B_CMD[$i]'
+    done
+    case $worker_stage in "$runtime"/worker_*) rm -rf -- "$worker_stage" ;; esac
+    worker_stage=
+    worker_start=
+    worker_child_note=
+    worker_ctrl_start=0
+    worker_source_cpu_start=0
+    worker_source_cpu_tuple=
+    worker_count=0
+    worker_include_context=0
+    worker_context_mode=none
+  }
+  cancel_worker() {
+    local i key tier canceled_worker=$worker_pid canceled_start=$worker_start
+    [[ -n $worker_pid ]] || return 0
+    if owned_active "$canceled_worker"; then
+      kill "$canceled_worker" 2>/dev/null
+    fi
+    stop_worker_child
+    stop_owned_local "$canceled_worker" "$canceled_start"
+    stop_worker_child
+    owned_remove "$canceled_worker"
+    finish_worker_budget "$((SECONDS * 1000))" 0
+    for ((i=1; i<=worker_count; i++)); do
+      key=${B_JOB[$i]-}
+      [[ -n $key ]] || continue
+      tier=${JOB_TIER[$key]-O}
+      case $tier in
+        O) job_unset "$key" ;;
+        *)
+          JOB_PHASE[$key]=queued
+          append_retry "$key"
+          ;;
+      esac
+      unset 'B_JOB[$i]' 'B_PID[$i]' 'B_DEPTH[$i]' 'B_USER[$i]' \
+        'B_PKG[$i]' 'B_UID[$i]' 'B_CMD[$i]'
+    done
+    case $worker_context_mode in
+      optional) resolve_o_candidates canceled ;;
+    esac
+    case $worker_stage in "$runtime"/worker_*) rm -rf -- "$worker_stage" ;; esac
+    worker_pid=
+    worker_start=
+    worker_stage=
+    worker_child_note=
+    worker_ctrl_start=0
+    worker_source_cpu_start=0
+    worker_source_cpu_tuple=
+    worker_count=0
+    worker_include_context=0
+    worker_context_mode=none
+  }
+  drain_mandatory() {
+    local why=$1 deadline=$((SECONDS + diag_to * 2 + 5))
+    case $worker_class:$worker_context_mode in
+      O:*|M:mandatory) cancel_worker ;;
+    esac
+    while mandatory_exists; do
+      if [[ -n $worker_pid ]]; then
+        if [[ -f $worker_stage/READY ]]; then
+          reap_worker || return
+        elif ((SECONDS >= deadline)); then
+          cancel_worker
+          break
+        else
+          sleep 0.1
+        fi
+      else
+        launch_worker || return
+        [[ -n $worker_pid ]] || break
+      fi
+    done
+    if [[ -n $worker_pid && -f $worker_stage/READY ]]; then
+      reap_worker || return
+    fi
+  }
+
+  profile_job_epoch() {
+    case $refresh in
+      hourly) reply=$out_hour ;;
+      daily) reply=$out_day ;;
+      off) reply=$invocation_epoch ;;
+    esac
+  }
+  request_optional() {
+    local entity=$1 snapshot=$2 key
+    ((watch && context)) || return 0
+    observer_open || return 0
+    mandatory_exists && return 0
+    profile_job_epoch
+    job_key "$reply" "$entity" O
+    key=$reply
+    [[ -z ${JOB_PHASE[$key]-} ]] || return 0
+    profile_job_epoch
+    enqueue_job "$reply" "$entity" O "$snapshot"
+    key=$reply
+    if active_fresh; then
+      if entity_active "$entity" "${JOB_PID[$key]-0}" "${JOB_UID[$key]--}" \
+           "${JOB_USER[$key]--}" "${JOB_PKG[$key]--}"; then
+        job_unset "$key"
+      fi
+    else
+      JOB_PHASE[$key]=context_wait
+      o_refresh_due=1
+    fi
+  }
+  normalize_thresholds() {
+    local max fallback_low=1000 fallback_high=9000
+    ((topmax100 > 0)) || topmax100=$((device_nproc * 10000))
+    max=$topmax100
+    low100=$low_arg
+    high100=$high_arg
+    if ((low100 < 0 || high100 < low100 || high100 > max)); then
+      low100=$fallback_low
+      high100=$fallback_high
+      if ((topmax_genuine)); then
+        ((high100 > max)) && high100=$max
+        ((low100 > high100)) && low100=$high100
+      fi
+    fi
+    thresholds_ready=1
+  }
+  top_header_line() {
+    local h=${1%$'\r'}
+    h=${h//\[/ }
+    h=${h//\]/ }
+    [[ $h =~ ^[[:space:]]*PID[[:space:]]+UID[[:space:]]+USER[[:space:]]+PR[[:space:]]+NI[[:space:]]+VIRT[[:space:]]+RES[[:space:]]+SHR[[:space:]]+S[[:space:]]+%CPU[[:space:]]+%MEM[[:space:]]+TIME\+[[:space:]]+ARGS[[:space:]]*$ ]]
+  }
+  save_selected_top() {
+    local stage=$1 observation=$2 partial=$3 raw_only=$4 truncated=$5
+    local chain tuple sid
+    join4 top device raw v8
+    chain=$reply
+    commit_state top "$chain" "$stage" "$observation" 0 0 0 || return
+    sid=$COMMIT_ID
+    if ((COMMIT_NEW)); then
+      init_occurrence "$sid"
+      saved_n=$((saved_n + 1))
+    else
+      occurrence_tuple "$frame_iso" "$source_index" "$partial" "$raw_only" \
+        "$truncated" "$frame_drop_bytes" "$frame_drop_lines"
+      tuple=$reply
+      add_top_occurrence "$sid" "$tuple" || return
+    fi
+    selected_n=$((selected_n + 1))
+    last_selected_epoch=$frame_epoch
+  }
+  finish_frame() {
+    local partial=${1-0} line pid uid_col user pr ni virt res shr state cpu mem timep args
+    local saw=0 rows_seen=0 bad=0 ambiguous=0 cpu100 key hot=0 select=0 raw_only=0
+    local observation snapshot
+    local -a order=()
+    local -A sum=() hottest=() hotpid=() hotkind=() hotlabel=()
+    local -A hotuser=() hotuid=() hotpkg=() hotcmd=()
+    [[ -n $frame_file && -f $frame_file ]] || return 0
+    snapshot_capture_helpers
+    while IFS= read -r line; do
+      line=${line%$'\r'}
+      if [[ $line =~ ^[[:space:]]*([0-9]+)%cpu ]]; then
+        topmax100=$((10#${BASH_REMATCH[1]} * 100))
+        topmax_genuine=1
+        thresholds_ready=0
+      fi
+      if top_header_line "$line"; then
+        saw=1
+        continue
+      fi
+      ((saw)) || continue
+      [[ -n $line ]] || continue
+      read -r pid uid_col user pr ni virt res shr state cpu mem timep args <<<"$line"
+      if [[ $pid =~ ^[1-9][0-9]*$ && $uid_col =~ ^[0-9]+$ ]] &&
+           parse_pct100 "$cpu" && [[ -n $args ]]; then
+        cpu100=$reply
+        ((rows_seen++))
+        profiler_pid "$pid" && continue
+        resolve_entity "$user" "$args" "$pid" "$uid_col"
+        key=$TARGET_KEY
+        case $TARGET_KIND in ambiguous) ((ambiguous++)) ;; esac
+        if [[ -z ${sum[$key]-} ]]; then
+          order+=("$key")
+          sum[$key]=0
+          hottest[$key]=-1
+        fi
+        sum[$key]=$((sum[$key] + cpu100))
+        if ((cpu100 > hottest[$key])); then
+          hottest[$key]=$cpu100
+          hotpid[$key]=$pid
+          hotkind[$key]=$TARGET_KIND
+          hotlabel[$key]=$TARGET_LABEL
+          hotuser[$key]=$TARGET_USER
+          hotuid[$key]=$TARGET_UID
+          hotpkg[$key]=$TARGET_PKG
+          hotcmd[$key]=$TARGET_CMD
+        fi
+      else
+        ((bad++))
+      fi
+    done <"$frame_file"
+    if ((partial == 0 && saw && rows_seen)); then
+      ((source_healthy_frames++))
+      if ((source_healthy_frames >= 3)); then source_retry=0; fi
+    else
+      source_healthy_frames=0
+    fi
+    ((thresholds_ready)) || normalize_thresholds
+    ((saw && rows_seen)) || raw_only=1
+    for key in "${order[@]}"; do
+      remember_entity "$key" "${hotkind[$key]}" "${hotlabel[$key]}" \
+        "${hotuser[$key]}" "${hotuid[$key]}" "${hotpkg[$key]}" \
+        "${hotcmd[$key]}" "${hotpid[$key]}"
+      ((sum[$key] >= low100)) && hot=1
+    done
+    if ((partial || frame_drop_bytes || raw_only || hot)); then
+      select=1
+    elif (((source_index - 1) % every == 0)); then
+      if ((period == 0 || last_selected_epoch == 0 ||
+            frame_epoch - last_selected_epoch >= period)); then
+        select=1
+      fi
+    fi
+    observation="captured=$frame_iso source=$source_index partial=$partial raw_only=$raw_only truncated=$((frame_drop_bytes > 0)) bad_rows=$bad ambiguous_rows=$ambiguous drop_bytes=$frame_drop_bytes drop_lines=$frame_drop_lines"
+    if ((select)); then
+      save_selected_top "$frame_file" "$observation" "$partial" "$raw_only" \
+        "$((frame_drop_bytes > 0))" || return
+    else
+      rm -f -- "$frame_file"
+    fi
+    for key in "${order[@]}"; do
+      snapshot="source=$source_index pid=${hotpid[$key]} uid=${ENTITY_UID[$key]} cpu100=${sum[$key]}"
+      profile_job_epoch
+      if ((sum[$key] >= high100)); then
+        enqueue_job "$reply" "$key" H "$snapshot"
+      elif ((sum[$key] >= low100)); then
+        enqueue_job "$reply" "$key" L "$snapshot"
+      fi
+    done
+    for key in "${order[@]}"; do
+      ((sum[$key] >= low100)) || continue
+      request_optional "$key" \
+        "source=$source_index pid=${hotpid[$key]} uid=${ENTITY_UID[$key]} cpu100=${sum[$key]}"
+    done
+    frame_file=
+    frame_open=0
+    if ((max_reports > 0 && selected_n >= max_reports)); then
+      set_reason max_reports
+    fi
+  }
+  append_frame_line() {
+    local line=$1 n=$(( ${#1} + 1 ))
+    frame_total=$((frame_total + n))
+    if ((frame_kept + n <= frame_cap)); then
+      printf '%s\n' "$line" >>"$frame_file"
+      frame_kept=$((frame_kept + n))
+    else
+      frame_drop_bytes=$((frame_drop_bytes + n))
+      frame_drop_lines=$((frame_drop_lines + 1))
+    fi
+  }
+  append_frame_fragment() {
+    local fragment=$1 n=${#1}
+    frame_total=$((frame_total + n))
+    if ((frame_kept + n <= frame_cap)); then
+      printf '%s' "$fragment" >>"$frame_file"
+      frame_kept=$((frame_kept + n))
+    else
+      frame_drop_bytes=$((frame_drop_bytes + n))
+    fi
+  }
+  checkpoint_now() {
+    local why=$1
+    flush_occurrences || return
+    text_record CHECKPOINT \
+      "reason=$why source=$source_index selected=$selected_n saved=$saved_n records=$record_seq file_bytes=$file_bytes run_bytes=$run_bytes duty_debt_ms=$duty_debt" 0 ||
+      return
+    next_checkpoint=$((SECONDS + checkpoint_interval))
+  }
+  finish_day() {
+    local why=$1
+    ((output_open)) || return 0
+    case $why in
+      day_rotate|duration|until|max_reports|signal_*) drain_mandatory "$why" || return ;;
+    esac
+    if [[ -n $worker_pid ]]; then
+      if [[ -f $worker_stage/READY ]]; then reap_worker; else cancel_worker; fi
+    fi
+    flush_occurrences || return
+    cache_end "$why" 0 || return
+    disclose_jobs "$why" || return
+    text_record DAY_END \
+      "day=$out_day reason=$why records=$record_seq selected=$selected_n file_bytes=$file_bytes" 0 ||
+      return
+    exec {ofd}>&-
+    ofd=
+    output_open=0
+  }
+  clear_identity_state() {
+    ENTITY_KIND=()
+    ENTITY_LABEL=()
+    ENTITY_USER=()
+    ENTITY_UID=()
+    ENTITY_PKG=()
+    ENTITY_CMD=()
+    ENTITY_PID=()
+    ENTITY_KEYS=()
+    ACTIVE=()
+    active_at=0
+    thresholds_ready=0
+    topmax100=0
+    topmax_genuine=0
+    remote_top_pid=
+    remote_top_start=
+  }
+  handle_boot_change() {
+    local new_boot=$1 old_boot=$boot_id body=$runtime/boot_change_$RANDOM
+    if [[ -n $worker_pid ]]; then
+      if [[ -f $worker_stage/READY ]]; then reap_worker || return; else cancel_worker; fi
+    fi
+    cache_end boot_change 1 || return
+    disclose_jobs boot_change || return
+    printf 'old_boot=%s\tnew_boot=%s\tidentity_cache_jobs_inventory=reset\n' \
+      "$old_boot" "$new_boot" >"$body"
+    write_record BOOT_CHANGE "$body" 0 || {
+      local rc=$?
+      rm -f -- "$body"
+      return "$rc"
+    }
+    rm -f -- "$body"
+    reset_jobs
+    clear_identity_state
+    boot_id=$new_boot
+    adb_uid=$RECHECK_UID
+    device_nproc=$RECHECK_NPROC
+    remote_clk=$RECHECK_CLK
+    capture_inventory
+    write_record INVENTORY "$inventory_file" 0 || return
+    context_due=$context
+    context_attempt=0
+    context_epoch_done=
+    o_refresh_due=0
+  }
+  revalidate_device_identity() {
+    read_device_identity || {
+      set_reason reconnect_identity_error
+      return 2
+    }
+    [[ $RECHECK_UID == "$adb_uid" ]] || {
+      set_reason reconnect_uid_changed
+      return 2
+    }
+    if [[ $RECHECK_BOOT == "$boot_id" ]]; then
+      device_nproc=$RECHECK_NPROC
+      remote_clk=$RECHECK_CLK
+    else
+      handle_boot_change "$RECHECK_BOOT" || return
+    fi
+  }
+  scope_transition() {
+    local epoch=$1 stamp=$2 day=$3 hour=$4 iso=$5
+    if ((output_open == 0)); then
+      open_day "$day" "$hour" "$stamp"
+      return
+    fi
+    if [[ $day == "$out_day" ]]; then
+      :
+    else
+      finish_day day_rotate || return
+      case $refresh in
+        off) ;;
+        *) reset_jobs ;;
+      esac
+      hour_bytes=0
+      o_hour_bytes=0
+      open_day "$day" "$hour" "$stamp" || return
+      expire_terminal_jobs
+      return
+    fi
+    if [[ $hour == "$out_hour" ]]; then
+      :
+    else
+      cache_end hour_rotate || return
+      out_hour=$hour
+      hour_bytes=0
+      o_hour_bytes=0
+      case $refresh in hourly) profile_epoch=$hour ;; esac
+      expire_terminal_jobs
+      context_due=$context
+      context_attempt=0
+      context_epoch_done=
+    fi
+  }
+  check_limits() {
+    local now
+    [[ $reason == running ]] || return
+    if ((duration > 0 && SECONDS - run_start_seconds >= duration)); then
+      set_reason duration
+      return
+    fi
+    if ((until > 0)); then
+      now=$(date +%s)
+      if ((now >= until)); then
+        set_reason until
+        return
+      fi
+    fi
+    if ((max_bytes > 0 && run_bytes >= max_bytes)); then
+      hard_cap_closed=1
+      set_reason max_bytes
+    fi
+  }
+  clip_wait() {
+    local wanted=$1 remain now
+    reply=$wanted
+    if ((duration > 0)); then
+      remain=$((duration - (SECONDS - run_start_seconds)))
+      ((remain < reply)) && reply=$remain
+    fi
+    if ((until > 0)); then
+      now=$(date +%s)
+      remain=$((until - now))
+      ((remain < reply)) && reply=$remain
+    fi
+    ((reply < 0)) && reply=0
+  }
+
+  read -r -d '' REMOTE_TOP <<'V8_REMOTE_TOP'
+guard=$1
+rows=$2
+delay=$3
+fields=$4
+shift 4
+actual=$(id -u 2>/dev/null)
+if printf '%s\n' "$actual" | grep -Eq '^[0-9]+$'; then
+  :
+else
+  printf 'V8_TOP_UID_NONNUMERIC\n'
+  exit 46
+fi
+case $guard in
+  any) ;;
+  *) [ "$actual" = "$guard" ] || exit 46 ;;
+esac
+start=$(
+  s=$(cat "/proc/$$/stat" 2>/dev/null)
+  tail=${s##*) }
+  set -- $tail
+  [ "$#" -ge 20 ] || exit 45
+  printf '%s\n' "${20}"
+) || exit 45
+printf 'V8_TOP_OWNER %s %s\n' "$$" "$start"
+case $delay in
+  native)
+    exec nice -n 10 top -b -m "$rows" -o "$fields" -s 10 "$@"
+    ;;
+  *)
+    exec nice -n 10 top -b -m "$rows" -o "$fields" -d "$delay" -s 10 "$@"
+    ;;
+esac
+V8_REMOTE_TOP
+
+  top_column_preflight() {
+    local probe=$runtime/top_preflight.raw line clue=
+    local pid uid_col user pr ni virt res shr state cpu mem timep args saw=0
+    ro "$diag_to" top -b -n 1 -m 1 -o "$TOP_FIELDS" -s 10 \
+      "${TOP_EXTRA[@]}" >"$probe" 2>&1 || return 1
+    while IFS= read -r line; do
+      line=${line%$'\r'}
+      if top_header_line "$line"; then
+        saw=1
+        continue
+      fi
+      if [[ -z $clue ]]; then
+        case $line in *PID*|top:*|*top:\ *) clue=${line:0:512} ;; esac
+      fi
+      ((saw)) || continue
+      [[ -n $line ]] || continue
+      read -r pid uid_col user pr ni virt res shr state cpu mem timep args <<<"$line"
+      if [[ $pid =~ ^[1-9][0-9]*$ && $uid_col =~ ^[0-9]+$ ]] &&
+           parse_pct100 "$cpu" && [[ -n $args ]]; then
+        return 0
+      fi
+    done <"$probe"
+    if [[ -n $clue ]]; then
+      printf 'top preflight rejected header/error: %q\n' "$clue" >&2
+    fi
+    return 1
+  }
+  start_source() {
+    local script=$runtime/top_source.sh note=$runtime/source_owner_$RANDOM p s
+    ((++source_attempt))
+    revalidate_device_identity || return
+    top_column_preflight || {
+      set_reason top_layout_error
+      return 2
+    }
+    printf '%s\n' "$REMOTE_TOP" >"$script" || return 1
+    exec {source_fd}< <(
+      pid_start_local "$BASHPID" || exit 125
+      printf '%s %s\n' "$BASHPID" "$reply" >"$note.part" || exit 125
+      mv -- "$note.part" "$note" || exit 125
+      exec "${A[@]}" shell -T sh -s "$shell_uid" "$rows" "$delay" \
+        "$TOP_FIELDS" "${TOP_EXTRA[@]}" <"$script" 2>&1
+    ) || return 1
+    wait_pid_note "$note"
+    if (($?)); then
+      if [[ $source_fd =~ ^[0-9]+$ ]]; then
+        exec {source_fd}<&-
+        source_fd=
+      fi
+      if [[ -r $note ]]; then
+        read -r p s <"$note"
+        if [[ $p =~ ^[1-9][0-9]*$ && $s =~ ^[0-9]+$ ]]; then
+          stop_owned_local "$p" "$s"
+        fi
+      fi
+      rm -f -- "$note" "$note.part"
+      return 125
+    fi
+    source_pid=$reply
+    source_start=$reply2
+    owned_add "$source_pid" "$source_start" || {
+      stop_owned_local "$source_pid" "$source_start"
+      if [[ $source_fd =~ ^[0-9]+$ ]]; then
+        exec {source_fd}<&-
+        source_fd=
+      fi
+      source_pid=
+      source_start=
+      rm -f -- "$note" "$note.part"
+      return 125
+    }
+    remote_top_pid=
+    remote_top_start=
+    source_owner_seen=0
+    source_healthy_frames=0
+    source_noise=
+    return 0
+  }
+  read -r -d '' REMOTE_STOP_TOP <<'V8_REMOTE_STOP_TOP'
+guard=$1
+pid=$2
+expected=$3
+actual=$(id -u 2>/dev/null)
+if printf '%s\n' "$actual" | grep -Eq '^[0-9]+$'; then :; else exit 46; fi
+case $guard in any) ;; *) [ "$actual" = "$guard" ] || exit 46 ;; esac
+same_tuple() {
+  [ -r "/proc/$pid/stat" ] || return 1
+  s=$(cat "/proc/$pid/stat" 2>/dev/null) || return 1
+  tail=${s##*) }
+  set -- $tail
+  [ "$#" -ge 20 ] || return 1
+  [ "${20}" = "$expected" ]
+}
+same_tuple || exit 0
+kill -TERM "$pid" 2>/dev/null
+i=0
+while [ "$i" -lt 30 ]; do
+  same_tuple || exit 0
+  sleep 0.1
+  i=$((i + 1))
+done
+same_tuple || exit 0
+kill -KILL "$pid" 2>/dev/null
+V8_REMOTE_STOP_TOP
+
+  stop_remote_top() {
+    [[ $remote_top_pid =~ ^[1-9][0-9]*$ ]] || return 0
+    [[ $remote_top_start =~ ^[0-9]+$ ]] || return 0
+    timeout -k 2s "$((diag_to + 5))s" "${A[@]}" shell -T sh -s \
+      "$shell_uid" "$remote_top_pid" "$remote_top_start" \
+      <<<"$REMOTE_STOP_TOP" >/dev/null 2>&1
+    remote_top_pid=
+    remote_top_start=
+  }
+  stop_source() {
+    local rc=127
+    stop_remote_top
+    if [[ $source_fd =~ ^[0-9]+$ ]]; then
+      exec {source_fd}<&-
+      source_fd=
+    fi
+    if [[ $source_pid =~ ^[1-9][0-9]*$ ]]; then
+      stop_owned_local "$source_pid" "$source_start"
+      rc=$?
+      owned_remove "$source_pid"
+    fi
+    source_pid=
+    source_start=
+    source_owner_seen=0
+    SOURCE_RC=$rc
+  }
+  source_event() {
+    local read_rc=$1 source_rc=$2 snap epoch stamp day hour iso noise=
+    snap=$(clock_snapshot)
+    IFS='|' read -r epoch stamp day hour iso <<<"$snap"
+    scope_transition "$epoch" "$stamp" "$day" "$hour" "$iso" || return
+    if [[ -n $source_noise ]]; then esc "$source_noise"; noise=" preframe=$reply"; fi
+    text_record SOURCE_EVENT \
+      "attempt=$source_attempt read_rc=$read_rc source_rc=$source_rc retry=$source_retry$noise" 0
+    source_noise=
+  }
+  on_signal() {
+    set_reason signal_$1
+    if [[ $source_pid =~ ^[1-9][0-9]*$ ]]; then
+      pid_start_local "$source_pid"
+      [[ $reply == "$source_start" ]] && kill "$source_pid" 2>/dev/null
+    fi
+  }
+  finish_once() {
+    local status=${1-0} snap epoch stamp day hour iso clean_finish=1
+    ((finish_done == 0)) || return "$status"
+    finish_done=1
+    trap - HUP INT TERM
+    if ((frame_open)); then finish_frame 1; fi
+    stop_source
+    snap=$(clock_snapshot)
+    IFS='|' read -r epoch stamp day hour iso <<<"$snap"
+    case $reason in max_bytes|write_error) clean_finish=0 ;; esac
+    if ((output_open && clean_finish)); then
+      scope_transition "$epoch" "$stamp" "$day" "$hour" "$iso"
+      checkpoint_now final
+      finish_day "$reason"
+    elif ((output_open)); then
+      if [[ -n $worker_pid ]]; then cancel_worker; fi
+      exec {ofd}>&-
+      ofd=
+      output_open=0
+    elif [[ -n $worker_pid ]]; then
+      cancel_worker
+    fi
+    clear_prev
+    case $runtime in
+      "${TMPDIR:-/tmp}"/phone_top_v8.*) rm -rf -- "$runtime" ;;
+    esac
+    printf 'Stopped: %s; source=%s selected=%s saved=%s bytes=%s%s\n' \
+      "$reason" "$source_index" "$selected_n" "$saved_n" "$run_bytes" \
+      "${file:+; last=$file}"
+    case $reason in
+      signal_1) status=129 ;;
+      signal_2) status=130 ;;
+      signal_15) status=143 ;;
+      *_error|write_error|create_error) status=1 ;;
+    esac
+    return "$status"
+  }
+
+  trap 'on_signal 1' HUP
+  trap 'on_signal 2' INT
+  trap 'on_signal 15' TERM
+
+  connect_device || {
+    set_reason connect_error
+    finish_once 2
+    return $?
+  }
+  top_column_preflight || {
+    set_reason top_layout_error
+    finish_once 2
+    return $?
+  }
+  snap=$(clock_snapshot)
+  IFS='|' read -r now_epoch now_stamp now_day now_hour now_iso <<<"$snap"
+  if ((until > 0 && until <= now_epoch)); then
+    set_reason until
+  else
+    scope_transition "$now_epoch" "$now_stamp" "$now_day" "$now_hour" "$now_iso" ||
+      set_reason open_error
+  fi
+  if [[ $reason == running ]]; then
+    launch_worker || set_reason worker_launch_error
+    if [[ $reason == running ]]; then
+      start_source || set_reason source_start_error
+    fi
+  fi
+
+  while [[ $reason == running ]]; do
+    line=
+    clip_wait "$effective_source_to"
+    read_timeout=$reply
+    if ((read_timeout == 0)); then
+      check_limits
+      break
+    fi
+    if IFS= read -r -t "$read_timeout" -u "$source_fd" line; then
+      if ((frame_open == 0 && source_owner_seen == 0)) &&
+           [[ $line =~ ^V8_TOP_OWNER[[:space:]]+([1-9][0-9]*)[[:space:]]+([0-9]+)$ ]]; then
+        remote_top_pid=${BASH_REMATCH[1]}
+        remote_top_start=${BASH_REMATCH[2]}
+        source_owner_seen=1
+      elif [[ $line == Tasks:* || $line == Threads:* ]]; then
+        if ((frame_open)); then finish_frame 0 || set_reason frame_error; fi
+        [[ $reason == running ]] || break
+        if [[ -n $worker_pid && -f $worker_stage/READY ]]; then
+          reap_worker || set_reason worker_reap_error
+        elif [[ -n $worker_pid ]] && ((SECONDS >= worker_deadline)); then
+          cancel_worker
+        fi
+        [[ $reason == running ]] || break
+        snap=$(clock_snapshot)
+        IFS='|' read -r now_epoch now_stamp now_day now_hour now_iso <<<"$snap"
+        scope_transition "$now_epoch" "$now_stamp" "$now_day" "$now_hour" "$now_iso" ||
+          set_reason scope_error
+        [[ $reason == running ]] || break
+        if ((SECONDS >= next_checkpoint)); then
+          checkpoint_now periodic || set_reason checkpoint_error
+        fi
+        check_limits
+        [[ $reason == running ]] || break
+        launch_worker || set_reason worker_launch_error
+        [[ $reason == running ]] || break
+        ((source_index++))
+        frame_epoch=$now_epoch
+        frame_stamp=$now_stamp
+        frame_day=$now_day
+        frame_hour=$now_hour
+        frame_iso=$now_iso
+        frame_file=$runtime/frame_$source_index.raw
+        : >"$frame_file" || { set_reason frame_stage_error; break; }
+        frame_open=1
+        frame_kept=0
+        frame_total=0
+        frame_drop_bytes=0
+        frame_drop_lines=0
+        append_frame_line "$line"
+      elif ((frame_open)); then
+        append_frame_line "$line"
+      elif ((${#source_noise} < 4096)); then
+        source_noise+="${source_noise:+$'\n'}$line"
+      fi
+    else
+      read_rc=$?
+      if ((frame_open)); then
+        case $line in '') ;; *) append_frame_fragment "$line" ;; esac
+        finish_frame 1 || set_reason frame_error
+      elif [[ -n $line && ${#source_noise} -lt 4096 ]]; then
+        source_noise+="${source_noise:+$'\n'}$line"
+      fi
+      stop_source
+      check_limits
+      if [[ $reason == running ]]; then
+        source_event "$read_rc" "$SOURCE_RC" || set_reason source_event_error
+      fi
+      if [[ -n $worker_pid && -f $worker_stage/READY ]]; then
+        reap_worker || set_reason worker_reap_error
+      fi
+      check_limits
+      [[ $reason == running ]] || break
+      case $source_retry in
+        0) backoff=1 ;;
+        1) backoff=2 ;;
+        2) backoff=4 ;;
+        3) backoff=8 ;;
+        4) backoff=16 ;;
+        *) backoff=30 ;;
+      esac
+      ((source_retry++))
+      clip_wait "$backoff"
+      backoff=$reply
+      if ((backoff > 0)); then sleep "$backoff"; fi
+      check_limits
+      [[ $reason == running ]] || break
+      start_source || set_reason source_restart_error
+    fi
+    check_limits
+  done
+
+  status=0
+  finish_once "$status"
+
+)
+
+if test "${BASH_SOURCE[0]-}" = "$0"; then
+  phone_top_profile_v8 "$@"
+else
+  phone_top_profile_v8
+fi
