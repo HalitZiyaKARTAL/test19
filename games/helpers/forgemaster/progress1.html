@@ -1,0 +1,1555 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+
+<meta
+  name="viewport"
+  content="width=device-width,initial-scale=1,viewport-fit=cover"
+>
+
+<title>Forge Master Ascension Planner</title>
+
+<style>
+:root {
+  color-scheme: light dark;
+
+  --bg: #eef1f6;
+  --panel: #ffffff;
+  --panel-2: #f6f8fc;
+  --text: #151923;
+  --muted: #697386;
+  --line: #d9dfeb;
+  --track: #e3e8f1;
+
+  --blue: #5b7fff;
+  --yellow: #d3a100;
+  --mythic: #b34fe0;
+  --ascend-2: #159666;
+  --ascend-3: #1688a8;
+  --later-yellow: #e8792c;
+
+  --good: #13865a;
+  --near: #bd7d00;
+  --bad: #d6424d;
+
+  --shadow: 0 7px 24px rgba(25, 38, 70, 0.07);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #10131a;
+    --panel: #191e28;
+    --panel-2: #202632;
+    --text: #f3f5fa;
+    --muted: #aab3c2;
+    --line: #343c4d;
+    --track: #303747;
+
+    --blue: #7898ff;
+    --yellow: #e6bd38;
+    --mythic: #cf6aff;
+    --ascend-2: #42bd8d;
+    --ascend-3: #54c6df;
+    --later-yellow: #ff9855;
+
+    --good: #43c493;
+    --near: #e6bd38;
+    --bad: #ff7079;
+
+    --shadow: 0 8px 26px rgba(0, 0, 0, 0.22);
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  overflow-x: hidden;
+}
+
+body {
+  min-height: 100vh;
+
+  padding:
+    calc(13px + env(safe-area-inset-top))
+    11px
+    calc(25px + env(safe-area-inset-bottom));
+
+  background: var(--bg);
+  color: var(--text);
+
+  font-family:
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    Roboto,
+    Arial,
+    sans-serif;
+
+  touch-action: pan-y;
+}
+
+input,
+button {
+  font: inherit;
+}
+
+button {
+  touch-action: manipulation;
+}
+
+.page {
+  width: min(100%, 720px);
+  margin: auto;
+}
+
+.panel,
+.resource-card {
+  margin: 10px 0;
+  padding: 13px;
+
+  border: 1px solid var(--line);
+  border-radius: 17px;
+
+  background: var(--panel);
+  box-shadow: var(--shadow);
+}
+
+.hero {
+  padding: 15px;
+}
+
+.eyebrow {
+  color: var(--blue);
+
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+h1 {
+  margin: 3px 0 5px;
+
+  font-size: clamp(25px, 7vw, 37px);
+  line-height: 1;
+  letter-spacing: -0.035em;
+}
+
+.intro {
+  margin: 0;
+
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.inputs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+
+  margin-top: 12px;
+}
+
+.input-box {
+  min-width: 0;
+}
+
+.input-box label {
+  display: block;
+  margin: 0 0 4px 2px;
+
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.input-box input {
+  width: 100%;
+  min-width: 0;
+
+  padding: 9px 7px;
+
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  outline: none;
+
+  background: var(--panel-2);
+  color: var(--text);
+
+  font-size: 15px;
+  font-weight: 900;
+  text-align: center;
+}
+
+.input-box input:focus {
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px rgba(91, 127, 255, 0.16);
+}
+
+.hero-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+
+  margin-top: 9px;
+}
+
+.saved-note {
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.reset {
+  padding: 7px 10px;
+
+  border: 1px solid var(--line);
+  border-radius: 9px;
+
+  background: var(--panel-2);
+  color: var(--text);
+
+  font-size: 11px;
+  font-weight: 850;
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+
+  margin: 10px 0;
+}
+
+.legend-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+
+  padding: 5px 8px;
+
+  border: 1px solid var(--line);
+  border-radius: 999px;
+
+  background: var(--panel);
+
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.section-title {
+  margin: 0;
+
+  font-size: 18px;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+}
+
+.section-note {
+  margin: 3px 0 10px;
+
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.quick-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.quick-item {
+  min-width: 0;
+  padding: 9px 8px;
+
+  border: 1px solid var(--line);
+  border-radius: 11px;
+
+  background: var(--panel-2);
+}
+
+.quick-name {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.quick-target {
+  margin-top: 3px;
+
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.quick-value {
+  margin-top: 2px;
+
+  font-size: 11px;
+  font-weight: 850;
+}
+
+.readiness-groups {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.readiness-group {
+  min-width: 0;
+  padding: 10px;
+
+  border: 1px solid var(--line);
+  border-radius: 12px;
+
+  background: var(--panel-2);
+}
+
+.readiness-title {
+  margin-bottom: 7px;
+
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.readiness-list {
+  display: grid;
+  gap: 5px;
+}
+
+.readiness-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+
+  font-size: 10.5px;
+}
+
+.readiness-row span {
+  color: var(--muted);
+}
+
+.readiness-row strong {
+  white-space: nowrap;
+  font-size: 11px;
+}
+
+.resource-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.resource-name {
+  font-size: 20px;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+}
+
+.now-value {
+  color: var(--blue);
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.progress-area {
+  position: relative;
+
+  width: 100%;
+  height: 47px;
+
+  margin: 7px 4px 1px;
+
+  pointer-events: none;
+}
+
+.track {
+  position: absolute;
+  top: 17px;
+  left: 0;
+  right: 0;
+
+  height: 12px;
+
+  overflow: hidden;
+
+  border-radius: 999px;
+  background: var(--track);
+}
+
+.fill {
+  height: 100%;
+
+  border-radius: inherit;
+
+  background:
+    linear-gradient(
+      90deg,
+      var(--blue),
+      #8da6ff
+    );
+}
+
+.tick {
+  position: absolute;
+  top: 12px;
+
+  width: 3px;
+  height: 22px;
+
+  transform: translateX(-50%);
+
+  border: 1px solid var(--panel);
+  border-radius: 3px;
+}
+
+.now-marker {
+  position: absolute;
+  top: 6px;
+
+  width: 3px;
+  height: 35px;
+
+  transform: translateX(-50%);
+
+  border-radius: 4px;
+  background: var(--bad);
+}
+
+.now-marker::before {
+  content: "";
+
+  position: absolute;
+  top: -1px;
+  left: 50%;
+
+  width: 9px;
+  height: 9px;
+
+  transform: translateX(-50%);
+
+  border: 2px solid var(--panel);
+  border-radius: 50%;
+
+  background: var(--bad);
+}
+
+.now-tag {
+  position: absolute;
+  top: -6px;
+
+  transform: translateX(-50%);
+
+  padding: 1px 4px;
+
+  border-radius: 5px;
+
+  background: var(--bad);
+  color: #ffffff;
+
+  font-size: 8px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.now-tag.end {
+  transform: translateX(-100%);
+}
+
+.progress-caption {
+  margin: 0 1px 9px;
+
+  color: var(--muted);
+  font-size: 10px;
+  text-align: right;
+}
+
+.cycle-group {
+  margin-top: 8px;
+}
+
+.cycle-heading {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+
+  margin-bottom: 5px;
+
+  color: var(--muted);
+
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.cycle-heading::after {
+  content: "";
+
+  flex: 1;
+  height: 1px;
+
+  background: var(--line);
+}
+
+.milestones {
+  display: grid;
+  gap: 5px;
+}
+
+.milestone {
+  display: grid;
+  grid-template-columns: 39px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 7px;
+
+  min-width: 0;
+  padding: 7px 8px;
+
+  border: 1px solid var(--line);
+  border-radius: 10px;
+
+  background: var(--panel-2);
+}
+
+.milestone.completed-row {
+  opacity: 0.72;
+}
+
+.milestone.next-row {
+  border-color: var(--blue);
+  box-shadow: inset 3px 0 0 var(--blue);
+}
+
+.code {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+
+  font-size: 12px;
+  font-weight: 950;
+}
+
+.dot {
+  width: 9px;
+  height: 9px;
+  flex: 0 0 auto;
+
+  border-radius: 50%;
+}
+
+.milestone-info {
+  min-width: 0;
+}
+
+.milestone-title {
+  font-size: 11px;
+  font-weight: 850;
+  line-height: 1.2;
+}
+
+.milestone-meta {
+  margin-top: 2px;
+
+  color: var(--muted);
+  font-size: 9.5px;
+  line-height: 1.25;
+}
+
+.status {
+  white-space: nowrap;
+
+  font-size: 10.5px;
+  font-weight: 900;
+  text-align: right;
+}
+
+.good {
+  color: var(--good);
+}
+
+.near {
+  color: var(--near);
+}
+
+.bad {
+  color: var(--bad);
+}
+
+.coin-grid {
+  display: grid;
+  gap: 6px;
+}
+
+.coin-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+
+  padding: 9px;
+
+  border: 1px solid var(--line);
+  border-radius: 10px;
+
+  background: var(--panel-2);
+
+  font-size: 11px;
+}
+
+.coin-row span {
+  color: var(--muted);
+}
+
+.coin-row strong {
+  white-space: nowrap;
+}
+
+.coin-input {
+  margin-bottom: 8px;
+}
+
+.assumption {
+  margin-top: 8px;
+
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+@media (max-width: 440px) {
+  .panel,
+  .resource-card {
+    padding: 11px;
+  }
+
+  .readiness-groups {
+    grid-template-columns: 1fr;
+  }
+
+  .milestone {
+    grid-template-columns: 36px minmax(0, 1fr) auto;
+    gap: 5px;
+    padding: 7px 6px;
+  }
+
+  .status {
+    font-size: 10px;
+  }
+}
+</style>
+</head>
+
+<body>
+<main class="page">
+
+  <section class="panel hero">
+    <div class="eyebrow">
+      Max-tech three-ascension planner
+    </div>
+
+    <h1>Forge Master Milestones</h1>
+
+    <p class="intro">
+      You can already perform Ascension #1.
+      The values below are your cumulative bank from now through
+      Ascension #3 and its final Mythic rebuild.
+    </p>
+
+    <div class="inputs">
+      <div class="input-box">
+        <label for="skills">Skills</label>
+
+        <input
+          id="skills"
+          value="194k"
+          inputmode="decimal"
+          autocomplete="off"
+        >
+      </div>
+
+      <div class="input-box">
+        <label for="pets">Pets</label>
+
+        <input
+          id="pets"
+          value="134k"
+          inputmode="decimal"
+          autocomplete="off"
+        >
+      </div>
+
+      <div class="input-box">
+        <label for="mounts">Mounts</label>
+
+        <input
+          id="mounts"
+          value="32.2k"
+          inputmode="decimal"
+          autocomplete="off"
+        >
+      </div>
+    </div>
+
+    <div class="hero-footer">
+      <span class="saved-note">
+        Values update and save automatically.
+      </span>
+
+      <button
+        id="reset"
+        class="reset"
+        type="button"
+      >
+        Reset
+      </button>
+    </div>
+  </section>
+
+  <div class="legend">
+    <div class="legend-chip">
+      <i
+        class="legend-dot"
+        style="background:var(--yellow)"
+      ></i>
+
+      Yellow
+    </div>
+
+    <div class="legend-chip">
+      <i
+        class="legend-dot"
+        style="background:var(--mythic)"
+      ></i>
+
+      Mythic
+    </div>
+
+    <div class="legend-chip">
+      <i
+        class="legend-dot"
+        style="background:var(--ascend-2)"
+      ></i>
+
+      Ascension #2
+    </div>
+
+    <div class="legend-chip">
+      <i
+        class="legend-dot"
+        style="background:var(--ascend-3)"
+      ></i>
+
+      Ascension #3
+    </div>
+  </div>
+
+  <section class="panel">
+    <h2 class="section-title">
+      Next incomplete milestone
+    </h2>
+
+    <p class="section-note">
+      The nearest unfinished target for each resource.
+    </p>
+
+    <div
+      id="nextGrid"
+      class="quick-grid"
+    ></div>
+  </section>
+
+  <section class="panel">
+    <h2 class="section-title">
+      Ascension readiness
+    </h2>
+
+    <p class="section-note">
+      Cumulative amount still needed from your current bank.
+    </p>
+
+    <div class="readiness-groups">
+      <div class="readiness-group">
+        <div class="readiness-title">
+          Ascension #2
+        </div>
+
+        <div
+          id="ascension2List"
+          class="readiness-list"
+        ></div>
+      </div>
+
+      <div class="readiness-group">
+        <div class="readiness-title">
+          Ascension #3
+        </div>
+
+        <div
+          id="ascension3List"
+          class="readiness-list"
+        ></div>
+      </div>
+    </div>
+  </section>
+
+  <div id="cards"></div>
+
+  <section class="panel">
+    <h2 class="section-title">
+      Coins
+    </h2>
+
+    <p class="section-note">
+      Assumes the same max-tech coin cost repeats for each future
+      ascension cycle.
+    </p>
+
+    <div class="input-box coin-input">
+      <label for="coins">Current coins</label>
+
+      <input
+        id="coins"
+        value="1.59m"
+        inputmode="decimal"
+        autocomplete="off"
+      >
+    </div>
+
+    <div
+      id="coinGrid"
+      class="coin-grid"
+    ></div>
+
+    <div class="assumption">
+      Ascension #2 requires one complete future cycle.
+      Ascension #3 requires two complete future cycles.
+    </div>
+  </section>
+
+</main>
+
+<script>
+const definitions = [
+  {
+    code: "L1",
+    title: "Yellow after Ascension #1",
+    color: "var(--yellow)"
+  },
+  {
+    code: "M1",
+    title: "Mythic after Ascension #1",
+    color: "var(--mythic)"
+  },
+  {
+    code: "A2",
+    title: "Ready for Ascension #2",
+    color: "var(--ascend-2)"
+  },
+  {
+    code: "Y2",
+    title: "Yellow after Ascension #2",
+    color: "var(--later-yellow)"
+  },
+  {
+    code: "M2",
+    title: "Mythic after Ascension #2",
+    color: "var(--mythic)"
+  },
+  {
+    code: "A3",
+    title: "Ready for Ascension #3",
+    color: "var(--ascend-3)"
+  },
+  {
+    code: "Y3",
+    title: "Yellow after Ascension #3",
+    color: "var(--later-yellow)"
+  },
+  {
+    code: "M3",
+    title: "Mythic after Ascension #3",
+    color: "var(--mythic)"
+  }
+];
+
+const resources = [
+  {
+    key: "skills",
+    name: "Skill tickets",
+
+    targets: [
+      37200,
+      202200,
+      288000,
+      325200,
+      490200,
+      576000,
+      613200,
+      778200
+    ]
+  },
+
+  {
+    key: "pets",
+    name: "Eggshells",
+
+    targets: [
+      32400,
+      98333,
+      129000,
+      161400,
+      227333,
+      258000,
+      290400,
+      356333
+    ]
+  },
+
+  {
+    key: "mounts",
+    name: "Clockwinders",
+
+    targets: [
+      23000,
+      39500,
+      49500,
+      72500,
+      89000,
+      99000,
+      122000,
+      138500
+    ]
+  }
+];
+
+const defaults = {
+  skills: 194000,
+  pets: 134000,
+  mounts: 32200,
+  coins: 1590000
+};
+
+const coinTargets = {
+  ascension2: 34418325,
+  ascension3: 68836650
+};
+
+const cycleGroups = [
+  {
+    title: "After Ascension #1",
+    indexes: [0, 1, 2]
+  },
+  {
+    title: "After Ascension #2",
+    indexes: [3, 4, 5]
+  },
+  {
+    title: "After Ascension #3",
+    indexes: [6, 7]
+  }
+];
+
+function parseAmount(value) {
+  const cleaned = String(value)
+    .trim()
+    .toLowerCase()
+    .replaceAll(",", "")
+    .replace(/\s+/g, "");
+
+  const match = cleaned.match(
+    /^(\d*\.?\d+)(k|m|b)?$/
+  );
+
+  if (!match) {
+    return 0;
+  }
+
+  const multiplier = {
+    "": 1,
+    k: 1000,
+    m: 1000000,
+    b: 1000000000
+  }[match[2] || ""];
+
+  return Math.round(
+    Number(match[1]) * multiplier
+  );
+}
+
+function formatAmount(number) {
+  const absolute = Math.abs(number);
+
+  if (absolute >= 1000000000) {
+    return (
+      (number / 1000000000)
+        .toFixed(3)
+        .replace(/\.?0+$/, "") +
+      "b"
+    );
+  }
+
+  if (absolute >= 1000000) {
+    return (
+      (number / 1000000)
+        .toFixed(3)
+        .replace(/\.?0+$/, "") +
+      "m"
+    );
+  }
+
+  if (absolute >= 1000) {
+    return (
+      (number / 1000)
+        .toFixed(3)
+        .replace(/\.?0+$/, "") +
+      "k"
+    );
+  }
+
+  return Math
+    .round(number)
+    .toLocaleString("en-US");
+}
+
+function signed(number) {
+  return (
+    number < 0
+      ? "−"
+      : "+"
+  ) + formatAmount(
+    Math.abs(number)
+  );
+}
+
+function status(remaining) {
+  if (remaining <= 0) {
+    return {
+      className: "good",
+      text:
+        formatAmount(
+          Math.abs(remaining)
+        ) +
+        " surplus"
+    };
+  }
+
+  if (remaining <= 10000) {
+    return {
+      className: "near",
+      text:
+        formatAmount(remaining) +
+        " missing"
+    };
+  }
+
+  return {
+    className: "bad",
+    text:
+      formatAmount(remaining) +
+      " missing"
+  };
+}
+
+function currentValues() {
+  return {
+    skills: parseAmount(
+      document
+        .getElementById("skills")
+        .value
+    ),
+
+    pets: parseAmount(
+      document
+        .getElementById("pets")
+        .value
+    ),
+
+    mounts: parseAmount(
+      document
+        .getElementById("mounts")
+        .value
+    ),
+
+    coins: parseAmount(
+      document
+        .getElementById("coins")
+        .value
+    )
+  };
+}
+
+function nextIncompleteIndex(
+  resource,
+  current
+) {
+  const index = resource.targets.findIndex(
+    target => target > current
+  );
+
+  return index === -1
+    ? resource.targets.length - 1
+    : index;
+}
+
+function quickItem(
+  resource,
+  current,
+  index
+) {
+  const target = resource.targets[index];
+
+  const result = status(
+    target - current
+  );
+
+  return `
+    <div class="quick-item">
+      <div class="quick-name">
+        ${resource.name}
+      </div>
+
+      <div class="quick-target">
+        ${definitions[index].code}
+        · ${definitions[index].title}
+      </div>
+
+      <div class="quick-value ${result.className}">
+        ${result.text}
+      </div>
+    </div>
+  `;
+}
+
+function readinessRow(
+  resource,
+  current,
+  index
+) {
+  const result = status(
+    resource.targets[index] - current
+  );
+
+  return `
+    <div class="readiness-row">
+      <span>${resource.name}</span>
+
+      <strong class="${result.className}">
+        ${result.text}
+      </strong>
+    </div>
+  `;
+}
+
+function milestoneRow(
+  resource,
+  current,
+  index,
+  nextIndex
+) {
+  const target = resource.targets[index];
+  const remaining = target - current;
+
+  const result = status(remaining);
+
+  const previousTarget =
+    index === 0
+      ? current
+      : resource.targets[index - 1];
+
+  const step =
+    target - previousTarget;
+
+  const rowClasses = [
+    "milestone",
+
+    remaining <= 0
+      ? "completed-row"
+      : "",
+
+    index === nextIndex
+      ? "next-row"
+      : ""
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  return `
+    <div class="${rowClasses}">
+      <div class="code">
+        <i
+          class="dot"
+          style="
+            background:
+            ${definitions[index].color}
+          "
+        ></i>
+
+        ${definitions[index].code}
+      </div>
+
+      <div class="milestone-info">
+        <div class="milestone-title">
+          ${definitions[index].title}
+        </div>
+
+        <div class="milestone-meta">
+          Target ${formatAmount(target)}
+          · step ${signed(step)}
+        </div>
+      </div>
+
+      <div class="status ${result.className}">
+        ${result.text}
+      </div>
+    </div>
+  `;
+}
+
+function resourceCard(
+  resource,
+  current
+) {
+  const finalTarget =
+    resource.targets[
+      resource.targets.length - 1
+    ];
+
+  const progress = Math.min(
+    100,
+    current / finalTarget * 100
+  );
+
+  const nextIndex =
+    nextIncompleteIndex(
+      resource,
+      current
+    );
+
+  const tickHtml = resource.targets
+    .map((target, index) => {
+      const position =
+        target / finalTarget * 100;
+
+      return `
+        <span
+          class="tick"
+          style="
+            left:${position}%;
+            background:
+            ${definitions[index].color}
+          "
+        ></span>
+      `;
+    })
+    .join("");
+
+  const cycleHtml = cycleGroups
+    .map(group => {
+      const rows = group.indexes
+        .map(index =>
+          milestoneRow(
+            resource,
+            current,
+            index,
+            nextIndex
+          )
+        )
+        .join("");
+
+      return `
+        <div class="cycle-group">
+          <div class="cycle-heading">
+            ${group.title}
+          </div>
+
+          <div class="milestones">
+            ${rows}
+          </div>
+        </div>
+      `;
+    })
+    .join("");
+
+  return `
+    <section class="resource-card">
+      <div class="resource-head">
+        <div class="resource-name">
+          ${resource.name}
+        </div>
+
+        <div class="now-value">
+          ${formatAmount(current)}
+        </div>
+      </div>
+
+      <div class="progress-area">
+        <div class="track">
+          <div
+            class="fill"
+            style="width:${progress}%"
+          ></div>
+        </div>
+
+        ${tickHtml}
+
+        <span
+          class="now-marker"
+          style="left:${progress}%"
+        ></span>
+
+        <span
+          class="now-tag
+          ${progress > 92 ? "end" : ""}"
+          style="left:${progress}%"
+        >
+          NOW
+        </span>
+      </div>
+
+      <div class="progress-caption">
+        ${progress.toFixed(1)}%
+        of final M3 target
+      </div>
+
+      ${cycleHtml}
+    </section>
+  `;
+}
+
+function renderCoins(currentCoins) {
+  const ascension2Result = status(
+    coinTargets.ascension2 -
+    currentCoins
+  );
+
+  const ascension3Result = status(
+    coinTargets.ascension3 -
+    currentCoins
+  );
+
+  document
+    .getElementById("coinGrid")
+    .innerHTML = `
+      <div class="coin-row">
+        <span>Current coins</span>
+
+        <strong>
+          ${formatAmount(currentCoins)}
+        </strong>
+      </div>
+
+      <div class="coin-row">
+        <span>
+          Ascension #2 cumulative target
+        </span>
+
+        <strong>
+          ${formatAmount(
+            coinTargets.ascension2
+          )}
+        </strong>
+      </div>
+
+      <div class="coin-row">
+        <span>Position for Ascension #2</span>
+
+        <strong class="${ascension2Result.className}">
+          ${ascension2Result.text}
+        </strong>
+      </div>
+
+      <div class="coin-row">
+        <span>
+          Ascension #3 cumulative target
+        </span>
+
+        <strong>
+          ${formatAmount(
+            coinTargets.ascension3
+          )}
+        </strong>
+      </div>
+
+      <div class="coin-row">
+        <span>Position for Ascension #3</span>
+
+        <strong class="${ascension3Result.className}">
+          ${ascension3Result.text}
+        </strong>
+      </div>
+    `;
+}
+
+function render() {
+  const current = currentValues();
+
+  document
+    .getElementById("nextGrid")
+    .innerHTML = resources
+      .map(resource =>
+        quickItem(
+          resource,
+          current[resource.key],
+          nextIncompleteIndex(
+            resource,
+            current[resource.key]
+          )
+        )
+      )
+      .join("");
+
+  document
+    .getElementById("ascension2List")
+    .innerHTML = resources
+      .map(resource =>
+        readinessRow(
+          resource,
+          current[resource.key],
+          2
+        )
+      )
+      .join("");
+
+  document
+    .getElementById("ascension3List")
+    .innerHTML = resources
+      .map(resource =>
+        readinessRow(
+          resource,
+          current[resource.key],
+          5
+        )
+      )
+      .join("");
+
+  document
+    .getElementById("cards")
+    .innerHTML = resources
+      .map(resource =>
+        resourceCard(
+          resource,
+          current[resource.key]
+        )
+      )
+      .join("");
+
+  renderCoins(current.coins);
+
+  localStorage.setItem(
+    "forgeMasterAscension3",
+    JSON.stringify(current)
+  );
+}
+
+function loadSavedValues() {
+  try {
+    const saved = JSON.parse(
+      localStorage.getItem(
+        "forgeMasterAscension3"
+      )
+    );
+
+    if (!saved) {
+      return;
+    }
+
+    document
+      .getElementById("skills")
+      .value =
+        formatAmount(
+          saved.skills ??
+          defaults.skills
+        );
+
+    document
+      .getElementById("pets")
+      .value =
+        formatAmount(
+          saved.pets ??
+          defaults.pets
+        );
+
+    document
+      .getElementById("mounts")
+      .value =
+        formatAmount(
+          saved.mounts ??
+          defaults.mounts
+        );
+
+    document
+      .getElementById("coins")
+      .value =
+        formatAmount(
+          saved.coins ??
+          defaults.coins
+        );
+  } catch {
+    localStorage.removeItem(
+      "forgeMasterAscension3"
+    );
+  }
+}
+
+function resetValues() {
+  document
+    .getElementById("skills")
+    .value = "194k";
+
+  document
+    .getElementById("pets")
+    .value = "134k";
+
+  document
+    .getElementById("mounts")
+    .value = "32.2k";
+
+  document
+    .getElementById("coins")
+    .value = "1.59m";
+
+  render();
+}
+
+[
+  "skills",
+  "pets",
+  "mounts",
+  "coins"
+].forEach(id => {
+  document
+    .getElementById(id)
+    .addEventListener(
+      "input",
+      render
+    );
+});
+
+document
+  .getElementById("reset")
+  .addEventListener(
+    "click",
+    resetValues
+  );
+
+loadSavedValues();
+render();
+</script>
+</body>
+</html>
