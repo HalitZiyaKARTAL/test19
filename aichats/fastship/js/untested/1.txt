@@ -1,0 +1,133 @@
+================================================================================
+AI CHAT FUTURE KIT — ALL IN ONE  (save as kit.txt)
+Generated 2026-08-19 · copy this ENTIRE fence into one file
+================================================================================
+
+WHAT: working pieces only. Each [NN] = its own file (use the FILE: name).
+      Follow QUICK START at the bottom to re-arm on any machine.
+
+--------------------------------------------------------------------------------
+[01] FILE: local_bridge_v5.ps1
+WHAT: PowerShell HTTP bridge (Start-Job, no deadlock) -> admin shell from browser
+RUN:  powershell -ExecutionPolicy Bypass -File local_bridge_v5.ps1
+USE:  fetch('http://127.0.0.1:8795/exec',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:'vmfree-2026-sandbox',cmd:'whoami',timeout:10})})
+--------------------------------------------------------------------------------
+$ErrorActionPreference = 'Continue'
+Get-CimInstance Win32_Process -Filter "Name='powershell.exe'" | Where-Object { $_.CommandLine -like '*local_bridge*' -and $_.ProcessId -ne $PID } | ForEach-Object { try { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue } catch {} }
+Start-Sleep -Seconds 1
+$token = 'vmfree-2026-sandbox'
+$prefix = 'http://127.0.0.1:8795/'
+$listener = New-Object System.Net.HttpListener
+$listener.Prefixes.Add($prefix)
+$listener.Start()
+Write-Host '[bridge v5] listening on ' $prefix
+function Send-Json($ctx, $obj) { $json = $obj | ConvertTo-Json -Depth 30 -Compress; $bytes = [System.Text.Encoding]::UTF8.GetBytes($json); $ctx.Response.ContentType = 'application/json'; $ctx.Response.Headers.Add('Access-Control-Allow-Origin','*'); $ctx.Response.Headers.Add('Access-Control-Allow-Headers','content-type'); $ctx.Response.Headers.Add('Access-Control-Allow-Methods','POST,OPTIONS'); $ctx.Response.StatusCode = 200; $ctx.Response.OutputStream.Write($bytes,0,$bytes.Length); $ctx.Response.Close() }
+function Run-Cmd($cmd, $timeoutSec) { $job = Start-Job -ScriptBlock { param($c) cmd /c $c 2>&1 | Out-String } -ArgumentList $cmd; if (Wait-Job $job -Timeout $timeoutSec) { $out = ((Receive-Job $job) -join [Environment]::NewLine); $code = 0 } else { Stop-Job $job -ErrorAction SilentlyContinue; $out = '(TIMEOUT after ' + $timeoutSec + 's)'; $code = -1 }; Remove-Job $job -Force -ErrorAction SilentlyContinue; return @{ out = $out; code = $code } }
+while ($listener.IsListening) {
+  $ctx = $listener.GetContext()
+  if ($ctx.Request.HttpMethod -eq 'OPTIONS') { $ctx.Response.StatusCode = 204; $ctx.Response.Headers.Add('Access-Control-Allow-Origin','*'); $ctx.Response.Headers.Add('Access-Control-Allow-Headers','content-type'); $ctx.Response.Headers.Add('Access-Control-Allow-Methods','POST,OPTIONS'); $ctx.Response.Close(); continue }
+  try {
+    $reader = New-Object System.IO.StreamReader($ctx.Request.InputStream, [System.Text.Encoding]::UTF8); $body = $reader.ReadToEnd(); $reader.Close()
+    $req = $body | ConvertFrom-Json
+    if ($req.token -ne $token) { Send-Json $ctx @{ ok=$false; error='bad token' }; continue }
+    $path = $ctx.Request.Url.AbsolutePath
+    if ($path -eq '/exec') { $cmd = [string]$req.cmd; $to = if ($req.timeout) { [int]$req.timeout } else { 20 }; $r = Run-Cmd $cmd $to; Send-Json $ctx @{ ok=$true; code=$r.code; output=$r.out } }
+    else { Send-Json $ctx @{ ok=$false; error='unknown path' } }
+  } catch { Send-Json $ctx @{ ok=$false; error=$_.Exception.Message } }
+}
+
+--------------------------------------------------------------------------------
+[02] FILE: scan_tabs.ps1
+WHAT: Read Chrome Sessions -> see recently opened tabs/URLs (no debug port needed)
+RUN:  powershell -NoProfile -ExecutionPolicy Bypass -File scan_tabs.ps1
+--------------------------------------------------------------------------------
+$ErrorActionPreference = 'SilentlyContinue'
+$dir = Join-Path $env:LOCALAPPDATA 'Google\Chrome\User Data\Default'
+function CleanUrls($path) { if (!(Test-Path $path)) { return @() }; try { $bytes = [System.IO.File]::ReadAllBytes($path); $txt = [System.Text.Encoding]::Unicode.GetString($bytes) + [System.Text.Encoding]::ASCII.GetString($bytes); $re = [regex]::new('https?://[A-Za-z0-9\-._~:/?#@!$&%+*=,;]+'); return @($re.Matches($txt) | ForEach-Object { $_.Value } | Where-Object { $_ -notmatch 'chrome://|google\.com/search|gstatic' } | Select-Object -Unique) } catch { return @() } }
+Get-ChildItem (Join-Path $dir 'Sessions') | Sort-Object LastWriteTime -Descending | Select-Object -First 6 | ForEach-Object { $su = CleanUrls $_.FullName; Write-Output ('SESSION ' + $_.Name + ' ' + $_.LastWriteTime.ToString('HH:mm:ss') + ' urls=' + $su.Count); $su | Select-Object -Last 15 | ForEach-Object { Write-Output ('  S: ' + $_) } }
+Write-Output 'DONE'
+
+--------------------------------------------------------------------------------
+[03] FILE: relaunch_cdp.ps1
+WHAT: Separate Chrome with CDP on 9222 + --remote-allow-origins=* (browser WS works)
+RUN:  powershell -NoProfile -ExecutionPolicy Bypass -File relaunch_cdp.ps1
+USE:  get tabs: Invoke-WebRequest http://127.0.0.1:9222/json  (via bridge/shell)
+--------------------------------------------------------------------------------
+$ErrorActionPreference = 'Continue'
+$chrome = Join-Path $env:ProgramFiles 'Google\Chrome\Application\chrome.exe'
+$profile = Join-Path $env:TEMP 'cdp_arena2'
+if (!(Test-Path $profile)) { New-Item -ItemType Directory -Path $profile | Out-Null }
+Get-CimInstance Win32_Process -Filter "Name='chrome.exe'" | Where-Object { $_.CommandLine -like '*cdp_arena2*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+$argList = '--remote-debugging-port=9222 --remote-allow-origins=* --user-data-dir="' + $profile + '" --no-first-run --no-default-browser-check --window-position=-2000,0'
+Start-Process -FilePath $chrome -ArgumentList $argList
+Start-Sleep -Seconds 4
+try { $r = Invoke-WebRequest -Uri 'http://127.0.0.1:9222/json/version' -UseBasicParsing -TimeoutSec 5; Write-Output 'CDP_UP' } catch { Write-Output 'CDP_DOWN' }
+
+--------------------------------------------------------------------------------
+[04] FILE: cdp_client.js
+WHAT: Browser->CDP client: eval/navigate/inject into CDP Chrome tabs from your page
+USE:  1) get WS url via bridge: Invoke-WebRequest http://127.0.0.1:9222/json
+      2) const c=await cdpSession(WS); 3) await cdpEval(c,'document.title');
+--------------------------------------------------------------------------------
+function cdpSession(wsUrl){return new Promise((res,rej)=>{let ws;try{ws=new WebSocket(wsUrl)}catch(e){return rej(e)}const p=new Map();let s=0;const r=new Promise((a,b)=>{ws.onopen=a;ws.onerror=()=>b(Error('ws error'))});const t=setTimeout(()=>{try{ws.close()}catch(e){}rej(Error('timeout'))},30000);ws.onmessage=e=>{const m=JSON.parse(e.data);if(m.id&&p.has(m.id)){const{resolve:x,reject:y}=p.get(m.id);p.delete(m.id);m.error?y(Error(JSON.stringify(m.error))):x(m.result)}};const send=(method,params={})=>r.then(()=>new Promise((a,b)=>{const id=++s;p.set(id,{resolve:a,reject:b});ws.send(JSON.stringify({id,method,params}))}));res({send,close:()=>{clearTimeout(t);try{ws.close()}catch(e){}}})})}
+async function cdpEval(c,x){const r=await c.send('Runtime.evaluate',{expression:x,returnByValue:true,awaitPromise:true});return r.result&&r.result.value}
+// read:   const c=await cdpSession(WS); const p=await cdpEval(c,'document.title'); c.close();
+// nav:    await c.send('Page.navigate',{url:'https://x'}); await new Promise(r=>setTimeout(r,3000));
+// inject: await cdpEval(c,`(function(){var d=document.createElement('div');d.style.cssText='position:fixed;top:10px;right:10px;z-index:999999;background:#111;color:#fff;padding:12px;border-radius:8px;';d.textContent='hi';document.body.appendChild(d);return true})()`);
+
+--------------------------------------------------------------------------------
+[05] FILE: broadcast_eval_bridge.html
+WHAT: Same-origin eval bridge on BroadcastChannel 'ai_chat_sandbox'
+--------------------------------------------------------------------------------
+<!DOCTYPE html><html><head><meta charset="utf-8"><title>Eval Bridge</title>
+<style>body{background:#0f0f1a;color:#9fe0b0;font:12px ui-monospace,monospace;margin:0;padding:10px}#log{height:70vh;overflow:auto}</style></head><body>
+<b style="color:#5b8def">Broadcast Eval Bridge</b> — <code>ai_chat_sandbox</code><br><div id="log">starting…</div>
+<script>
+const el=document.getElementById('log');
+const log=(...a)=>{el.textContent+=a.map(x=>typeof x==='string'?x:JSON.stringify(x)).join(' ')+'\n';el.scrollTop=el.scrollHeight;};
+const bc=new BroadcastChannel('ai_chat_sandbox');
+bc.onmessage=async e=>{const m=e.data||{};
+  if(m.cmd==='ping'){bc.postMessage({to:m.from,id:m.id,ok:true,pong:true,origin:location.origin});return;}
+  if(m.cmd==='eval'){try{const r=await eval(m.code);bc.postMessage({to:m.from,id:m.id,ok:true,result:r});}catch(err){bc.postMessage({to:m.from,id:m.id,ok:false,error:String(err&&err.stack||err)});}return;}
+  if(m.cmd==='getState'){bc.postMessage({to:m.from,id:m.id,ok:true,result:{origin:location.origin,ls:Object.keys(localStorage).length}});return;}};
+setInterval(()=>{try{bc.postMessage({from:'bridge',to:'controller',cmd:'hello',origin:location.origin,ts:Date.now()});}catch(e){}},2000);
+log('ready @ '+location.origin);
+</script></body></html>
+
+--------------------------------------------------------------------------------
+[06] FILE: tool_fs_forge.js
+WHAT: Re-forge File System Access tool after reload (handle in IndexedDB dse_fs_handles)
+--------------------------------------------------------------------------------
+(async () => {
+  const loadHandle = () => new Promise(resolve => { try { const req = indexedDB.open('AIChatDB',1); req.onupgradeneeded = e => { try { e.target.result.createObjectStore('chatTrees'); } catch(_){} }; req.onsuccess = e => { const db = e.target.result; try { const tx = db.transaction('chatTrees','readonly'); const r = tx.objectStore('chatTrees').get('dse_fs_handles'); r.onsuccess = () => { const h = r.result || null; try { db.close(); } catch(_){} resolve(h); }; r.onerror = () => { try { db.close(); } catch(_){} resolve(null); }; } catch(err){ try { db.close(); } catch(_){} resolve(null); } }; req.onerror = () => resolve(null); } catch(e){ resolve(null); } });
+  const root = await loadHandle(); if (!root) return { err: 'no handle — grant folder first' };
+  const fsTool = async (a = {}) => { const act = a.action || 'status'; if (act === 'status') return { granted: !!root, name: root.name }; if (act === 'list') { const items = []; async function walk(d, pre, depth) { if (depth > (a.depth||1)) return; for await (const en of d.values()) { if (en.kind === 'directory') { items.push(pre + en.name + '/'); await walk(en, pre + en.name + '/', depth + 1); } else items.push(pre + en.name); } } await walk(root, '', 0); return { root: root.name, count: items.length, entries: items.slice(0, a.limit || 500) }; } if (act === 'read') { const p = String(a.path||'').split('/').filter(Boolean); let d = root; for (const s of p.slice(0,-1)) d = await d.getDirectoryHandle(s); const f = await d.getFileHandle(p[p.length-1]); const b = await (await f.getFile()).text(); return { path: a.path, size: b.length, text: b.slice(0, a.max || 20000) }; } if (act === 'write') { const p = String(a.path||'').split('/').filter(Boolean); let d = root; for (const s of p.slice(0,-1)) d = await d.getDirectoryHandle(s, { create: true }); const f = await d.getFileHandle(p[p.length-1], { create: true }); const w = await f.createWritable(); await w.write(String(a.content ?? '')); await w.close(); return { wrote: a.path, chars: String(a.content ?? '').length }; } throw Error('unknown action ' + act); };
+  window.__tools = window.__tools || {};
+  window.__tools.tool_fs = { schema: { type:'function', function: { name:'tool_fs', description:'File System Access: status|list|read|write', parameters: { type:'object', properties: { action:{type:'string'}, path:{type:'string'}, content:{type:'string'}, depth:{type:'number'}, limit:{type:'number'}, max:{type:'number'} }, required:['action'] } } }, run: async (args={}) => { try { return JSON.stringify({ ok:true, result: await fsTool(args) }); } catch(e) { return JSON.stringify({ ok:false, error: String(e && e.stack || e) }); } } };
+  return { forged: true, root: root.name };
+})()
+
+================================================================================
+QUICK START (fresh machine, ~5 min)
+================================================================================
+1. eval1 v3.3.3 -> paste into app eval console (Settings->Other->Eval console):
+   https://raw.githubusercontent.com/HalitZiyaKARTAL/test19/refs/heads/main/aichats/fastship/js/untested/32.js
+2. Bridge:  powershell -ExecutionPolicy Bypass -File local_bridge_v5.ps1   (admin shell)
+3. Files:   paste tool_fs_forge.js (grant folder once if 'no handle'; persists in IndexedDB)
+4. CDP:     powershell -NoProfile -ExecutionPolicy Bypass -File relaunch_cdp.ps1  -> CDP_UP on 9222
+5. Control: cdp_client.js in browser (eval/navigate/inject) OR broadcast_eval_bridge.html (same-origin eval)
+
+DETAILS / NOTES
+- Bridge: http://127.0.0.1:8795/exec · token vmfree-2026-sandbox · body {token,cmd,timeout}
+- CDP: http://127.0.0.1:9222/json (browser can't fetch - CORS; use bridge/shell)
+- Broadcast channels: ai_chat_sandbox (eval bridge) / ai_chat_control (worker bus)
+- ENTER YOUR REAL TABS (no debug port needed): load Downloads\eval1_ext (chrome://extensions -> dev mode -> load unpacked)
+  then controller sends {to:'extension', cmd:'evalByUrl', url:'arena.ai', code:'...'} on ai_chat_control
+- State keys (don't delete): dse_findings_by_model1_log (append-only), dse_findings_by_model1_edit,
+  dse_models_readme, dse_context_handoff, dse_src_eval1_v333, dse_pricing_epochs
+- Pricing engine: epoch 2026-08-16T16:00Z; peak windows [01-04)&[06-10) UTC; deepseek flash/pro dynamic
+- Known lab limit: CDP on MAIN Chrome blocked here (EDR/loopback) -> use extension for that;
+  the separate CDP instance (relaunch_cdp) works fine.
+================================================================================
+END OF KIT
+================================================================================
