@@ -1,0 +1,44 @@
+QUICK START on a fresh machine (5 steps):
+
+1. eval1 v3.3.3 — fetch & paste into app eval console:
+   https://raw.githubusercontent.com/HalitZiyaKARTAL/test19/refs/heads/main/aichats/fastship/js/untested/32.js
+   (Settings → Other → enable "Eval console" → open → paste → Run)
+
+2. Bridge — run local_bridge_v5.ps1 in an admin shell
+   → [bridge v5] listening on http://127.0.0.1:8795/
+
+3. File access — paste tool_fs_forge.js; if "no handle", click a folder-grant
+   button once (handle persists in IndexedDB 'dse_fs_handles')
+
+4. CDP (optional) — run relaunch_cdp.ps1 → CDP_UP on 9222;
+   get tab WS urls via bridge: Invoke-WebRequest http://127.0.0.1:9222/json
+
+5. Control — use cdp_client.js in the browser to eval/navigate/inject;
+   or broadcast_eval_bridge.html for same-origin remote eval
+
+
+Tokens / ports (remember these):
+- Bridge: http://127.0.0.1:8795/exec · token vmfree-2026-sandbox · body {token, cmd, timeout}
+- CDP:    http://127.0.0.1:9222/json  (browser can't fetch — CORS; use bridge/shell)
+- Broadcast: channel ai_chat_sandbox (eval bridge) / ai_chat_control (worker bus)
+
+
+Extension (the "enter YOUR tabs" unlock, no debug port needed):
+- Folder Downloads\eval1_ext\ → chrome://extensions → Developer mode → Load unpacked
+- Then controller sends {to:'extension', cmd:'evalByUrl', url:'arena.ai', code:'...'} on ai_chat_control
+
+
+Findings / state keys (don't delete):
+- dse_findings_by_model1_log (append-only), dse_findings_by_model1_edit,
+  dse_models_readme, dse_context_handoff
+- dse_src_eval1_v333 (the 3.3.3 source), dse_pricing_epochs (date-aware pricing tables)
+
+
+Pricing engine note:
+- epoch 2026-08-16T16:00Z; peak windows [01-04) & [06-10) UTC;
+  deepseek flash/pro dynamic getters on providers + default_providers
+
+
+Known lab limitation:
+- attaching CDP to the MAIN Chrome instance is blocked here (EDR/loopback)
+  → use the extension for that; the separate CDP instance (relaunch_cdp) works fine
