@@ -1,0 +1,1 @@
+fetch('https://raw.githubusercontent.com/HalitZiyaKARTAL/test19/refs/heads/main/aichats/fastship/js/untested/.js').then(r=>r.text()).then(t=>eval(t)).then(()=>__eval1.version)
