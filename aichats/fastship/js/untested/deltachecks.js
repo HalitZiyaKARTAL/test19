@@ -1,6 +1,6 @@
 
 /* ============================================================
-   EVAL1 v4.2.0 — fresh redesign (written from zero)
+   EVAL1 v4.3.0 — fresh redesign (written from zero)
    Paste into eval console. Idempotent; disable() restores fully.
    Architecture:
      CORE · HOOKS · FETCH(bridges/coalescer) · PRICING · TOOLS
@@ -10,7 +10,7 @@
 'use strict';
 
 /* ============================ CORE ============================ */
-const VERSION = '4.2.0';
+const VERSION = '4.3.0';
 const NS = window.__eval1 = window.__eval1 || {};
 const FIRST = !NS._v4;
 
@@ -923,7 +923,7 @@ if (typeof MutationObserver !== 'undefined' && !window.__eval1_peakObs){
 
 /* Exp tab */
 const EXP_INFO = {
-  'About':'eval1 v4.2.0 — experimental controls. Persists via dse_eval1_config.',
+  'About':'eval1 v4.3.0 — experimental controls. Persists via dse_eval1_config.',
   'API mode':'auto per-model routing · chat force chat · responses profiled models → /responses.',
   'Peak counter':'off / only till end peak / till next state — countdown to DeepSeek peak-pricing boundary.',
   'Web search':'Attach the server web_search tool where supported.',
@@ -1198,4 +1198,91 @@ NS._internals = { addCumulativeUsage, toolSchema, activeToolName, toolNameForVer
 NS.version = VERSION;
 apply();
 console.log('[eval1 v' + VERSION + '] installed');
+/* ==================== 60.js — tool_eval_7 + fallback UI ==================== */
+(() => {
+  const esc60 = s => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  // 1) defaults
+  DEFAULTS.evalToolVersion = '7';
+  DEFAULTS.evalInProviders = false;
+  DEFAULTS.apiShapeFallback = 'auto';
+  DEFAULTS.pricingFallback = 'auto';
+  if (NS.config.evalToolVersion == null) NS.config.evalToolVersion = '7';
+  if (NS.config.evalInProviders == null) NS.config.evalInProviders = false;
+  if (NS.config.apiShapeFallback == null) NS.config.apiShapeFallback = 'auto';
+  if (NS.config.pricingFallback == null) NS.config.pricingFallback = 'auto';
+  // 2) tool_eval_7 full schema
+  NS.setToolVersionSchema(7, {
+    type:'function',
+    function:{
+      name:'tool_eval_7',
+      description:'Execute JavaScript in the client-side AI chat WebApp hosting this conversation. Returns ONLY the last statement\'s value (serialized as JSON). By default runs in an isolated Web Worker on a separate thread. SET "worker": false if you need to access window, document, or DOM on the main thread. You may issue multiple tool invokes with same-different names in one block — each tool call becomes an independent execution; never merge or drop any.',
+      parameters:{ type:'object', properties:{ code:{ type:'string', description:'JavaScript code to run.' }, timeout:{ type:'number' }, worker:{ type:'boolean', description:'false = full page DOM access. true = isolated worker (default)' } }, required:['code'] }
+    }
+  });
+  if (TOOL_VERSIONS[7]) TOOL_VERSIONS[7].desc = 'arrived in 60.js — app-aware wording; better app integration';
+  try { materializeTools(); } catch(e){}
+  try { const t7 = window.__tools && window.__tools['tool_eval_7']; if (t7 && NS._toolSchemas && NS._toolSchemas[7]) t7.schema = toolSchema('tool_eval_7', { schema: NS._toolSchemas[7] }); } catch(e){}
+  // 3) SETTERS + setters
+  SETTERS.evalInProviders = { bool:1 };
+  SETTERS.apiShapeFallback = { vals:['off','auto','on'] };
+  SETTERS.pricingFallback = { vals:['off','auto','on'] };
+  NS.setEvalInProviders = v => NS.set('evalInProviders', v);
+  NS.setApiShapeFallback = v => NS.set('apiShapeFallback', v);
+  NS.setPricingFallback = v => NS.set('pricingFallback', v);
+  // 4) EXP_INFO semantic edits + placeholders
+  EXP_INFO['Eval tool version'] = 'Which tool_eval schema is attached.\n 1 = original schema \n 2 = capability-wording schema \n 3 = worker-first \n 4 = no longer current schema \n 5 = mixed-tool nudge schema \n 6 = cost-annotated (per-round cost in tool result) \n 7 = arrived in 60.js — app-aware wording; increases clarifications for better integration to the app \n Schemas 1-5 are the 52-55.js era; 6 is the 56.js schema; 7 is the 60.js schema. "auto" = last-used; "off" = disabled.';
+  EXP_INFO['use eval in providers'] = 'placeholder';
+  EXP_INFO['api shape'] = 'placeholder';
+  EXP_INFO['pricing'] = 'placeholder';
+  // 5) UI patch
+  const popup60 = (title, text) => {
+    const old = document.getElementById('expPopupWrap'); if (old) old.remove();
+    const w = document.createElement('div'); w.id = 'expPopupWrap'; w.className = 'exp-popup-wrap';
+    w.innerHTML = '<div class="exp-popup-backdrop"></div><div class="exp-popup"><div class="exp-popup-head"><span>' + esc60(title) + '</span><button class="exp-popup-x" data-expx="1">×</button></div><div class="exp-popup-body">' + text + '</div><div class="exp-popup-foot"><button class="exp-popup-close" data-expx="1">Close</button></div></div>';
+    document.body.appendChild(w);
+    w.addEventListener('click', e => { if (e.target.closest('[data-expx]')) w.remove(); else if (!e.target.closest('.exp-popup')) w.remove(); });
+  };
+  const sel60 = (id, val) => '<select id="' + id + '">' + ['off','auto','on'].map(v => '<option value="' + v + '"' + (v === val ? ' selected' : '') + '>' + v + '</option>').join('') + '</select>';
+  const row60 = (label, ctrl, tip) => '<div class="setting-row"><span>' + esc60(label) + '<button type="button" class="exp-info" title="' + esc60(tip || '') + '">ⓘ</button></span>' + ctrl + '</div>';
+  const bindInfo60 = btn => { if (btn.__wired60) return; btn.__wired60 = 1;
+    btn.addEventListener('click', ev => { ev.preventDefault(); ev.stopPropagation(); const lab = btn.closest('.setting-row').querySelector('span').childNodes[0].textContent.trim(); popup60(lab, String(EXP_INFO[lab] || 'placeholder').split('\n').join('<br>')); });
+  };
+  function patchExpUI(){
+    if (window.__eval1UI60) return; window.__eval1UI60 = 1;
+    const gen = document.getElementById('exp-sub-general');
+    if (gen && !document.getElementById('expEvalInProviders')) {
+      const modeRow = document.getElementById('expMode') && document.getElementById('expMode').closest('.setting-row');
+      const html = '<div class="setting-row"><span>use eval in providers<button type="button" class="exp-info" title="use eval in providers">ⓘ</button></span><label class="toggle"><input type="checkbox" id="expEvalInProviders"' + (NS.config.evalInProviders ? ' checked' : '') + '><span class="slider"></span></label></div>';
+      if (modeRow) modeRow.insertAdjacentHTML('afterend', html); else gen.insertAdjacentHTML('beforeend', html);
+      const inp = document.getElementById('expEvalInProviders');
+      inp.addEventListener('change', () => NS.setEvalInProviders(inp.checked));
+      bindInfo60(inp.closest('.setting-row').querySelector('.exp-info'));
+    }
+    const tabs = document.querySelector('#tab-exp .exp-tabs');
+    const tabExp = document.getElementById('tab-exp');
+    if (tabs && tabExp && !document.querySelector('#tab-exp .tab-btn[data-exp-sub="fallbacks"]')) {
+      tabs.insertAdjacentHTML('beforeend', '<button class="tab-btn" data-exp-sub="fallbacks">Fallbacks</button>');
+      tabExp.insertAdjacentHTML('beforeend', '<div class="tab-content" id="exp-sub-fallbacks">' + row60('api shape', sel60('expApiShape', NS.config.apiShapeFallback || 'auto'), 'api shape') + row60('pricing', sel60('expPricing', NS.config.pricingFallback || 'auto'), 'pricing') + '</div>');
+      const btn = document.querySelector('#tab-exp .tab-btn[data-exp-sub="fallbacks"]');
+      if (btn) btn._ = document.getElementById('exp-sub-fallbacks');
+      document.getElementById('expApiShape').addEventListener('change', e => NS.setApiShapeFallback(e.target.value));
+      document.getElementById('expPricing').addEventListener('change', e => NS.setPricingFallback(e.target.value));
+      bindInfo60(document.getElementById('expApiShape').closest('.setting-row').querySelector('.exp-info'));
+      bindInfo60(document.getElementById('expPricing').closest('.setting-row').querySelector('.exp-info'));
+    }
+    const ev = document.getElementById('expEvalToolVersion');
+    if (ev) {
+      ev.innerHTML = '';
+      ev.appendChild(new Option('off', 'off')); ev.appendChild(new Option('auto (last used)', 'auto'));
+      let g = document.createElement('optgroup'); g.label = '52-55.js'; ev.appendChild(g); [1,2,3,4,5].forEach(id => g.appendChild(new Option('tool_eval_' + id, String(id))));
+      g = document.createElement('optgroup'); g.label = '56.js'; ev.appendChild(g); g.appendChild(new Option('tool_eval_6 (cost-annotated)', '6'));
+      g = document.createElement('optgroup'); g.label = '60.js'; ev.appendChild(g); g.appendChild(new Option('tool_eval_7 (60.js)', '7'));
+      ev.value = NS.config.evalToolVersion || 'auto';
+    }
+  }
+  patchExpUI();
+  const origRebuild60 = NS._rebuildExpTab;
+  NS._rebuildExpTab = () => { window.__eval1UI60 = 0; origRebuild60(); patchExpUI(); };
+  try { save(); } catch(e){}
+})();
 })();
