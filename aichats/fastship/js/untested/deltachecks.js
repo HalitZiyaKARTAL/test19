@@ -1,6 +1,5 @@
-
 /* ============================================================
-   EVAL1 v4.3.0 — fresh redesign (written from zero)
+   EVAL1 v4.5.0 — fresh redesign (written from zero)
    Paste into eval console. Idempotent; disable() restores fully.
    Architecture:
      CORE · HOOKS · FETCH(bridges/coalescer) · PRICING · TOOLS
@@ -10,7 +9,7 @@
 'use strict';
 
 /* ============================ CORE ============================ */
-const VERSION = '4.3.0';
+const VERSION = '4.5.0';
 const NS = window.__eval1 = window.__eval1 || {};
 const FIRST = !NS._v4;
 
@@ -19,7 +18,7 @@ const DEFAULTS = {
   markedSrc:'https://cdn.jsdelivr.net/npm/marked@18.0.9/lib/marked.umd.js',
   toolEchoCollapseChars:2000, thinkingHistory:'all', peakCounter:'off', toolFontScale:0.7,
   toolMaxTurns:100, toolMaxTurnsOn:true, autoTools:[],
-  evalToolVersion:'auto', evalToolNameOverride:'', evalToolNameOverrideOn:false,
+  evalToolVersion:'auto', evalToolNameOverride:'', evalToolNameOverrideOn:false, agenticTools:'on',
   toolCostNote:true
 };
 NS.config = Object.assign({}, DEFAULTS, NS.config || {});
@@ -534,10 +533,10 @@ const TOOL_VERSIONS = NS._toolVersions || (NS._toolVersions = {
 NS._toolSchemas = NS._toolSchemas || {};
 const validToolSchema = s => { const f = s && s.function, p = f && f.parameters; return !!(p && p.type === 'object' && p.properties && Array.isArray(p.required)); };
 const toolNameForVersion = v => { const t = TOOL_VERSIONS[+v]; return (t && t.name) || null; };
-const activeToolName = () => {
+const activeToolName = model => {
   const v = NS.config.evalToolVersion;
   if (v === 'off') return null;
-  if (v === 'auto') return NS._lastEvalTool || toolNameForVersion(5);
+  if (v === 'auto') { const m = model || (typeof getCurrentModel === 'function' ? getCurrentModel() : '') || ''; return (NS._lastEvalToolByModel && NS._lastEvalToolByModel[m]) || toolNameForVersion(7); }
   return toolNameForVersion(v);
 };
 const overrideToolName = () => (NS.config.evalToolNameOverrideOn && NS.config.evalToolNameOverride) ? NS.config.evalToolNameOverride : '';
@@ -618,8 +617,19 @@ function agenticMake(next){
         seen[name] = 1;
         list.push(toolSchema(name, d));
       };
-      const tn = overrideToolName() || activeToolName();
-      if (tn){ push(tn); NS._lastEvalTool = tn; }
+      seedFromView();
+      const am = NS.config.agenticTools || 'on';
+      if (am === 'off') return [];
+      const prior = (am === 'auto' && r && r.m && NS._lastToolsOnByModel) ? NS._lastToolsOnByModel[r.m] : null;
+      let tn = overrideToolName();
+      if (prior && prior.length){
+        prior.forEach(n => { const d = window.__tools[n]; if (d) push(n); });
+        tn = tn || prior.find(x => /^tool_eval/.test(x)) || null;
+        NS.config.webSearch = prior.includes('web_search');
+      } else {
+        tn = tn || activeToolName(r.m);
+      }
+      if (tn){ push(tn); NS._lastEvalTool = tn; if (r && r.m){ NS._lastEvalToolByModel[r.m] = tn; NS._lastToolsOnByModel[r.m] = [tn].concat(NS.config.autoTools || []); } }
       (NS.config.autoTools || []).forEach(push);
       Object.keys(window.__tools || {}).forEach(n => { const t = window.__tools[n]; if (t && t.auto && n !== tn) push(n); });
       return list;
@@ -632,12 +642,14 @@ function agenticMake(next){
   }
   return async function(messages, node, vIndex, controller, r){
     r = r || run();
+    window.__sc0 = NS.stats.searchCalls;
     window.__dseCurrentMsg = node && node.id || null;
     try {
       const p = r.p, key = getApiKey(p.id), isStream = settings.streaming, modelId = r.m;
       const tools = resolveTools(r);
       const payload = Object.assign({}, r.request, { model:modelId, temperature:r.supportsTemperature === false ? void 0 : (r.temperature != null ? r.temperature : .7), stream:isStream });
       if (tools.length){ payload.tools = tools; if (!payload.tool_choice) payload.tool_choice = 'auto'; }
+      try { const _md = node.versions[vIndex].metadata = node.versions[vIndex].metadata || {}; _md.tools = {}; (payload.tools || []).forEach(_t => { const _n = _t.function && _t.function.name; if (_n) _md.tools[_n] = 0; }); if (NS.config.webSearch && _md.tools.web_search == null) _md.tools.web_search = 0; } catch(e){}
       payload[p.maxTokensParam || 'max_tokens'] = r.maxTokens;
       if (isStream && p.supportsStreamUsage) payload.stream_options = { include_usage:true };
       node.versions[vIndex].startTime = Date.now();
@@ -747,6 +759,7 @@ function agenticMake(next){
               }
             }
             uiContent += '\n\n```javascript\n// Executing: ' + (tc.function && tc.function.name) + '\n' + (tc.function && tc.function.arguments) + '\n```\n';
+            try { const _mt = node.versions[vIndex].metadata && node.versions[vIndex].metadata.tools; const _n = tc.function && tc.function.name; if (_mt && _n && _mt[_n] != null) _mt[_n]++; } catch(e){}
             toolEvents.push({ role:'tool', tool_call_id:tc.id, content:toolContent });
             uiContent += '\n```json\n// Result\n' + toolContent + '\n```\n\n';
             node.versions[vIndex].rawContent = uiContent;
@@ -766,6 +779,7 @@ function agenticMake(next){
       if (toolEvents.length) node.versions[vIndex]._toolEvents = toolEvents;
       await saveStreamBuffer(node, vIndex);
       node.versions[vIndex].endTime = node.lastUpdateTime || Date.now();
+      try { const _md = node.versions[vIndex].metadata; const _d = NS.stats.searchCalls - (window.__sc0 || 0); if (_md && _md.tools && _md.tools.web_search != null && _d > 0) _md.tools.web_search += _d; } catch(e){}
       finalizeGeneration(node, vIndex, controller);
     } finally { window.__dseCurrentMsg = null; }
   };
@@ -939,7 +953,7 @@ const EXP_INFO = {
   'Responses hybrid':'Chat → /responses for profiled models (deepseek-v4-*, gpt-5.6-*).',
   'Routing':'Where the next request goes given mode + toggles.',
   'routing algorithm':'Where the next request goes given mode + toggles.',
-  'Eval tool version':'Which tool_eval schema is attached.\n 1 = original schema \n 2 = capability-wording schema \n 3 = worker-first \n 4 = current schema \n 5 = mixed-tool nudge schema \n 6 = cost-annotated (per-round cost in tool result) \n 7 = future placeholder \n Schemas 1-5 are the 52-55.js era; 6 is the 56.js schema. "auto" = last-used; "off" = disabled.',
+  'Eval tool version':'Which tool_eval schema is attached.\n 1 = original schema \n 2 = capability-wording schema \n 3 = worker-first \n 4 = current schema \n 5 = mixed-tool nudge schema \n 6 = cost-annotated (per-round cost in tool result) \n 7 = future placeholder \n Schemas 1-5 are the 52-55.js era; 6 is the 56.js schema. "auto" = per-model last-used (seeded from visible branch, fallback 7); "off" = disabled.',
   'Name override (cache mask)':'Rename the attached eval tool (cache-mask: avoids repeated identical tool schemas colliding as cache keys).',
   'Tool limit per message':'Max tool-call rounds the agentic loop may run for a single message.',
   'Tool font scale':'Font scale for tool-echo code blocks (compounds with the global code font scale).',
@@ -1202,11 +1216,11 @@ console.log('[eval1 v' + VERSION + '] installed');
 (() => {
   const esc60 = s => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   // 1) defaults
-  DEFAULTS.evalToolVersion = '7';
+  DEFAULTS.evalToolVersion = 'auto';
   DEFAULTS.evalInProviders = false;
   DEFAULTS.apiShapeFallback = 'auto';
   DEFAULTS.pricingFallback = 'auto';
-  if (NS.config.evalToolVersion == null) NS.config.evalToolVersion = '7';
+  if (NS.config.evalToolVersion == null) NS.config.evalToolVersion = 'auto';
   if (NS.config.evalInProviders == null) NS.config.evalInProviders = false;
   if (NS.config.apiShapeFallback == null) NS.config.apiShapeFallback = 'auto';
   if (NS.config.pricingFallback == null) NS.config.pricingFallback = 'auto';
@@ -1284,5 +1298,106 @@ console.log('[eval1 v' + VERSION + '] installed');
   const origRebuild60 = NS._rebuildExpTab;
   NS._rebuildExpTab = () => { window.__eval1UI60 = 0; origRebuild60(); patchExpUI(); };
   try { save(); } catch(e){}
+})();
+
+/* ==================== 61.js — per-model auto eval tool (seed-at-attach) ==================== */
+NS._lastEvalToolByModel = NS._lastEvalToolByModel || {};
+function seedFromView(){
+  const byEval = {}, byTools = {};
+  try {
+    const nodes = typeof getViewNodes === 'function' ? getViewNodes() : [];
+    for (const n of nodes){
+      if (!n || n.role !== 'assistant') continue;
+      const v = (n.versions && n.versions[n.activeVersion]) || {};
+      const model = v.metadata && v.metadata.model;
+      if (!model) continue;
+      let names = null;
+      const mt = v.metadata && v.metadata.tools;
+      if (mt && typeof mt === 'object' && !Array.isArray(mt)){ names = Object.keys(mt).filter(Boolean); }
+      if (!names || !names.length){ const tb = v.toolBatch; if (tb && Array.isArray(tb.names)) names = tb.names.filter(Boolean); }
+      if (names && names.length){ byTools[model] = names.slice(); const et = names.find(x => /^tool_eval/.test(x)); if (et) byEval[model] = et; }
+    }
+  } catch(e){}
+  NS._lastEvalToolByModel = byEval;
+  NS._lastToolsOnByModel = byTools;
+}
+NS.refreshBranchTools = function(){ NS._lastEvalToolByModel = {}; seedFromView(); };
+try { seedFromView(); } catch(e){}
+
+
+/* ==================== 63.js UI: Agentic tools dropdown (on/auto/off) + tool-set grey + persistence ==================== */
+(() => {
+  const SUB = ['expWebSearch','expEvalToolVersion','expEvalToolNameOverrideOn'];
+  try { SETTERS.agenticTools = { vals:['off','auto','on'] }; } catch(e){}
+  // persist flags (status pill etc.) — eval1 never saved these before
+  const saveFlags = () => { try { const f = {}; FLAGS.forEach((k,i)=>{ f[k]=NS.flags[k]; }); localStorage.setItem('dse_eval1_flags', JSON.stringify(f)); } catch(e){} };
+  if (NS.setFlag && !NS.setFlag.__persist63){
+    const orig = NS.setFlag;
+    NS.setFlag = function(name, val){ const r = orig.call(this, name, val); try { save(); saveFlags(); } catch(e){} return r; };
+    NS.setFlag.__persist63 = 1;
+  }
+  // restore flags from storage at boot
+  try {
+    const saved = JSON.parse(localStorage.getItem('dse_eval1_flags') || '{}');
+    let changed = false;
+    FLAGS.forEach(k => { if (saved[k] != null && NS.flags[k] !== saved[k]) { NS.flags[k] = saved[k]; changed = true; } });
+    if (changed) { try { apply(); } catch(e){} }
+  } catch(e){}
+
+  const build = () => {
+    const oldRow = document.getElementById('expTools') ? document.getElementById('expTools').closest('.setting-row') : null;
+    if (!oldRow) return;
+    const cur = NS.config.agenticTools || 'on';
+    const opts = [{v:'on',l:'on'},{v:'auto',l:'auto(to cache hit)'},{v:'off',l:'off'}];
+    const html = '<select id="expToolsMode">' + opts.map(o => '<option value="' + o.v + '"' + (o.v === cur ? ' selected' : '') + '>' + o.l + '</option>').join('') + '</select>';
+    let sel = document.getElementById('expToolsMode');
+    if (!sel) {
+      const ctrl = oldRow.querySelector('label.toggle');
+      if (ctrl) ctrl.outerHTML = html; else oldRow.insertAdjacentHTML('beforeend', html);
+      sel = document.getElementById('expToolsMode');
+    } else {
+      sel.innerHTML = opts.map(o => '<option value="' + o.v + '"' + (o.v === cur ? ' selected' : '') + '>' + o.l + '</option>').join('');
+    }
+    const applyGrey = () => {
+      const mode = sel.value;
+      try { NS.set('agenticTools', mode); } catch(e){ NS.config.agenticTools = mode; }
+      if (mode === 'off') { try { NS.setFlag('tools', 0); } catch(e){} } else { try { NS.setFlag('tools', 1); } catch(e){} }
+      const grey = mode !== 'on';
+      SUB.forEach(id => {
+        const el = document.getElementById(id); if (!el) return;
+        const row = el.closest('.setting-row'); if (!row) return;
+        row.classList.toggle('o', grey);
+        row.title = grey ? 'superseded by auto(to cache hit) — toggle does nothing until Agentic tools = on' : '';
+      });
+    };
+    if (!sel.__bound63) { sel.__bound63 = 1; sel.addEventListener('change', applyGrey); }
+    applyGrey();
+  };
+  window.__eval1UI63 = 0;
+  build();
+  const orig = NS._rebuildExpTab;
+  NS._rebuildExpTab = () => { window.__eval1UI63 = 0; if (orig) orig(); build(); };
+  window.__eval1UI63 = 1;
+})();
+
+/* ==================== 65.js — seed gate (covers both autos) ==================== */
+(() => {
+  const origSeed = typeof seedFromView === 'function' ? seedFromView : null;
+  if (!origSeed || NS._seedGated65) return;
+  NS._seedGated65 = 1;
+  const anyAuto = () => {
+    const am = NS.config.agenticTools || 'on';
+    const ev = NS.config.evalToolVersion || 'auto';
+    return am === 'auto' || ev === 'auto';
+  };
+  seedFromView = function(){
+    if (!anyAuto()) {
+      NS._lastEvalToolByModel = {};
+      NS._lastToolsOnByModel = {};
+      return;
+    }
+    return origSeed.apply(this, arguments);
+  };
+  NS.refreshBranchTools = function(){ NS._lastEvalToolByModel = {}; return origSeed(); };
 })();
 })();
