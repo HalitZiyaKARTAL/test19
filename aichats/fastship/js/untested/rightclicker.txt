@@ -1,0 +1,20 @@
+Add-Type @'
+using System;
+using System.Runtime.InteropServices;
+
+public static class GuestRightClickTest
+{
+    [DllImport("user32.dll")]
+    static extern void mouse_event(uint flags, uint x, uint y, uint data, UIntPtr extra);
+
+    public static void Click()
+    {
+        mouse_event(0x0008, 0, 0, 0, UIntPtr.Zero);
+        mouse_event(0x0010, 0, 0, 0, UIntPtr.Zero);
+    }
+}
+'@
+
+Write-Host "Right-click will occur in 5 seconds. Move over the desktop."
+Start-Sleep -Seconds 5
+[GuestRightClickTest]::Click()
