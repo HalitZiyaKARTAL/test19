@@ -1,0 +1,366 @@
+if (-not ('MiddleToRightV3' -as [type])) {
+    Add-Type -ReferencedAssemblies @(
+        'System.Windows.Forms.dll'
+        'System.Drawing.dll'
+    ) -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+using System.Threading;
+using System.Windows.Forms;
+
+public static class MiddleToRightV3
+{
+    static readonly object gate = new object();
+    static readonly ManualResetEvent ready = new ManualResetEvent(false);
+
+    static Thread worker;
+    static RemapWindow window;
+    static string startupStatus;
+    static IntPtr consoleInput;
+    static int previousConsoleMode = -1;
+
+    public static string Start()
+    {
+        lock (gate) {
+            if (worker != null && worker.IsAlive)
+                return "Already active. Ctrl+Alt+Q stops it.";
+
+            DisableQuickEdit();
+
+            ready.Reset();
+            startupStatus = null;
+
+            worker = new Thread(ThreadMain);
+            worker.IsBackground = true;
+            worker.SetApartmentState(ApartmentState.STA);
+            worker.Start();
+        }
+
+        if (!ready.WaitOne(5000)) {
+            Stop();
+            return "Startup timed out.";
+        }
+
+        return startupStatus;
+    }
+
+    public static string Stop()
+    {
+        Thread activeWorker;
+        RemapWindow activeWindow;
+
+        lock (gate) {
+            activeWorker = worker;
+            activeWindow = window;
+        }
+
+        if (activeWorker == null || !activeWorker.IsAlive) {
+            RestoreQuickEdit();
+            return "Already stopped.";
+        }
+
+        try {
+            if (activeWindow != null && activeWindow.IsHandleCreated) {
+                activeWindow.BeginInvoke(
+                    (MethodInvoker)delegate { activeWindow.Close(); }
+                );
+            }
+        }
+        catch { }
+
+        if (Thread.CurrentThread != activeWorker)
+            activeWorker.Join(3000);
+
+        return activeWorker.IsAlive ? "Stop request sent." : "Stopped.";
+    }
+
+    public static bool Active
+    {
+        get {
+            lock (gate) {
+                return worker != null &&
+                       worker.IsAlive &&
+                       window != null &&
+                       window.HookActive;
+            }
+        }
+    }
+
+    static void ThreadMain()
+    {
+        try {
+            RemapWindow activeWindow = new RemapWindow();
+
+            lock (gate)
+                window = activeWindow;
+
+            Application.Run(activeWindow);
+        }
+        catch (Exception error) {
+            startupStatus = "Failed: " + error.Message;
+            ready.Set();
+        }
+        finally {
+            lock (gate) {
+                window = null;
+                worker = null;
+            }
+
+            RestoreQuickEdit();
+        }
+    }
+
+    internal static void Started(bool hookActive, bool hotkeyActive, int error)
+    {
+        startupStatus = hookActive
+            ? "Active: middle press is now right-click; wheel scrolling is unchanged. " +
+              (hotkeyActive
+                  ? "Ctrl+Alt+Q stops it."
+                  : "Stop with [MiddleToRightV3]::Stop().")
+            : "Hook installation failed. Win32 error: " + error;
+
+        ready.Set();
+    }
+
+    static void DisableQuickEdit()
+    {
+        consoleInput = GetStdHandle(-10);
+
+        uint mode;
+        previousConsoleMode =
+            GetConsoleMode(consoleInput, out mode) &&
+            SetConsoleMode(consoleInput, (mode | 0x80u) & ~0x40u)
+                ? (int)mode
+                : -1;
+    }
+
+    internal static void RestoreQuickEdit()
+    {
+        int mode = Interlocked.Exchange(ref previousConsoleMode, -1);
+
+        if (mode >= 0)
+            SetConsoleMode(consoleInput, (uint)mode);
+    }
+
+    sealed class RemapWindow : Form
+    {
+        const int WH_MOUSE_LL     = 14;
+        const int WM_MBUTTONDOWN  = 0x0207;
+        const int WM_MBUTTONUP    = 0x0208;
+        const int WM_HOTKEY       = 0x0312;
+
+        const uint RIGHTDOWN = 0x0008;
+        const uint RIGHTUP   = 0x0010;
+
+        delegate IntPtr MouseProc(int code, IntPtr wParam, IntPtr lParam);
+
+        readonly MouseProc mouseProc;
+        IntPtr hook;
+        bool hotkeyRegistered;
+        bool rightHeld;
+
+        internal bool HookActive {
+            get { return hook != IntPtr.Zero; }
+        }
+
+        internal RemapWindow()
+        {
+            mouseProc = MouseHook;
+            ShowInTaskbar = false;
+            Opacity = 0;
+            WindowState = FormWindowState.Minimized;
+        }
+
+        protected override void OnLoad(EventArgs e)
+        {
+            base.OnLoad(e);
+
+            hook = SetWindowsHookEx(
+                WH_MOUSE_LL,
+                mouseProc,
+                GetModuleHandle(null),
+                0
+            );
+
+            int error = hook == IntPtr.Zero
+                ? Marshal.GetLastWin32Error()
+                : 0;
+
+            hotkeyRegistered = RegisterHotKey(
+                Handle,
+                1,
+                0x0001 | 0x0002, // Alt + Ctrl
+                0x51             // Q
+            );
+
+            MiddleToRightV3.Started(
+                hook != IntPtr.Zero,
+                hotkeyRegistered,
+                error
+            );
+
+            if (hook == IntPtr.Zero)
+                BeginInvoke((MethodInvoker)delegate { Close(); });
+        }
+
+        protected override void WndProc(ref Message message)
+        {
+            if (message.Msg == WM_HOTKEY &&
+                message.WParam.ToInt32() == 1) {
+                Close();
+                return;
+            }
+
+            base.WndProc(ref message);
+        }
+
+        IntPtr MouseHook(int code, IntPtr wParam, IntPtr lParam)
+        {
+            if (code >= 0) {
+                int message = wParam.ToInt32();
+
+                if (message == WM_MBUTTONDOWN) {
+                    if (!rightHeld) {
+                        EmitRight(RIGHTDOWN);
+                        rightHeld = true;
+                    }
+
+                    return new IntPtr(1);
+                }
+
+                if (message == WM_MBUTTONUP) {
+                    if (rightHeld) {
+                        EmitRight(RIGHTUP);
+                        rightHeld = false;
+                    }
+
+                    return new IntPtr(1);
+                }
+            }
+
+            return CallNextHookEx(hook, code, wParam, lParam);
+        }
+
+        protected override void OnFormClosed(FormClosedEventArgs e)
+        {
+            if (rightHeld) {
+                EmitRight(RIGHTUP);
+                rightHeld = false;
+            }
+
+            if (hook != IntPtr.Zero)
+                UnhookWindowsHookEx(hook);
+
+            hook = IntPtr.Zero;
+
+            if (hotkeyRegistered)
+                UnregisterHotKey(Handle, 1);
+
+            base.OnFormClosed(e);
+        }
+
+        static void EmitRight(uint flag)
+        {
+            INPUT input = new INPUT();
+
+            input.type = 0; // INPUT_MOUSE
+            input.data.mouse.dwFlags = flag;
+            input.data.mouse.dwExtraInfo = new UIntPtr(0x4D3252u);
+
+            if (SendInput(
+                    1,
+                    ref input,
+                    Marshal.SizeOf(typeof(INPUT))
+                ) == 0) {
+                mouse_event(flag, 0, 0, 0, UIntPtr.Zero);
+            }
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        struct MOUSEINPUT
+        {
+            public int dx;
+            public int dy;
+            public uint mouseData;
+            public uint dwFlags;
+            public uint time;
+            public UIntPtr dwExtraInfo;
+        }
+
+        [StructLayout(LayoutKind.Explicit)]
+        struct INPUTUNION
+        {
+            [FieldOffset(0)]
+            public MOUSEINPUT mouse;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        struct INPUT
+        {
+            public uint type;
+            public INPUTUNION data;
+        }
+
+        [DllImport("user32.dll", SetLastError = true)]
+        static extern IntPtr SetWindowsHookEx(
+            int id,
+            MouseProc callback,
+            IntPtr module,
+            uint threadId
+        );
+
+        [DllImport("user32.dll")]
+        static extern bool UnhookWindowsHookEx(IntPtr hook);
+
+        [DllImport("user32.dll")]
+        static extern IntPtr CallNextHookEx(
+            IntPtr hook,
+            int code,
+            IntPtr wParam,
+            IntPtr lParam
+        );
+
+        [DllImport("kernel32.dll")]
+        static extern IntPtr GetModuleHandle(string name);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        static extern uint SendInput(
+            uint count,
+            ref INPUT input,
+            int size
+        );
+
+        [DllImport("user32.dll")]
+        static extern void mouse_event(
+            uint flags,
+            uint dx,
+            uint dy,
+            uint data,
+            UIntPtr extra
+        );
+
+        [DllImport("user32.dll", SetLastError = true)]
+        static extern bool RegisterHotKey(
+            IntPtr window,
+            int id,
+            uint modifiers,
+            uint key
+        );
+
+        [DllImport("user32.dll")]
+        static extern bool UnregisterHotKey(IntPtr window, int id);
+    }
+
+    [DllImport("kernel32.dll")]
+    static extern IntPtr GetStdHandle(int type);
+
+    [DllImport("kernel32.dll")]
+    static extern bool GetConsoleMode(IntPtr handle, out uint mode);
+
+    [DllImport("kernel32.dll")]
+    static extern bool SetConsoleMode(IntPtr handle, uint mode);
+}
+'@
+}
+
+[MiddleToRightV3]::Start()
