@@ -2133,7 +2133,7 @@ NS.setDiscountCounter = v => NS.set('discountCounter', v);
   NS.setAutoSourceToken = v => { C.autoSourceToken = String(v || ''); saveCfg(); };
   let st = document.getElementById('autoSrcPadRule');
   if (!st) { st = document.createElement('style'); st.id = 'autoSrcPadRule'; document.head.appendChild(st); }
-  st.textContent = '#settingsPanel #expAutoSourceToken{padding:1px 6px!important;box-sizing:border-box!important;padding-inline-end:calc(var(--text-w,0px)*var(--ap,0.1)+var(--ach,3ch))!important}';
+  st.textContent = '#settingsPanel #expAutoSourceToken{padding:1px 6px!important}' + '#settingsPanel #expAutoSourceToken{padding-right:calc(var(--text-w,0px)*var(--ap,0.1) + var(--ach,3ch))!important;padding-inline-end:calc(var(--text-w,0px)*var(--ap,0.1) + var(--ach,3ch))!important}';
   (() => {
     const sb = document.getElementById('saveProvJsonBtn'); if (!sb || sb.__91h) return; sb.__91h = 1;
     const snap = () => { const o = {}; try { Object.keys(providers || {}).forEach(id => { try { o[id] = JSON.stringify(providers[id]); } catch(e){} }); } catch(e){} return o; };
