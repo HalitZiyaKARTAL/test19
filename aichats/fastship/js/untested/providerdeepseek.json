@@ -1,0 +1,63 @@
+{
+  "id": "deepseek",
+  "name": "DeepSeek",
+  "source": "default",
+  "sched": [
+    { "kind": "week", "days": [1,2,3,4,5], "from": 3600000,  "to": 14400000, "state": "peak" },
+    { "kind": "week", "days": [1,2,3,4,5], "from": 21600000, "to": 36000000, "state": "peak" }
+  ],
+  "baseURL": "https://api.deepseek.com",
+  "apiPath": "/chat/completions",
+  "authHeader": "Bearer",
+  "defaultModel": "deepseek-flash",
+  "maxTokensParam": "max_tokens",
+  "systemRole": "system",
+  "supportsStreamUsage": true,
+  "usageProfile": "openai",
+  "usageFamily": "chat",
+  "balance": { "path": "/user/balance", "parse": ["balance_infos", 0, "total_balance"], "mode": "balance", "currency": "USD" },
+  "fallbackModels": {
+    "deepseek-flash": {
+      "id": "deepseek-flash", "maxTokens": 384000, "contextTokens": 1000000, "outputTokens": 384000, "temperature": 1,
+      "request": { "thinking": { "type": "enabled" }, "reasoning_effort": "max" },
+      "pricing": { "inputCacheHit": 6e-9, "inputCacheMiss": 3e-7, "output": 1.2e-6 },
+      "rates": {
+        "legacy": { "inputCacheHit": 3e-9, "inputCacheMiss": 1.5e-7, "output": 6e-7 },
+        "off":    { "inputCacheHit": 3e-9, "inputCacheMiss": 1.5e-7, "output": 6e-7 },
+        "peak":   { "inputCacheHit": 6e-9, "inputCacheMiss": 3e-7, "output": 1.2e-6 }
+      }
+    },
+    "deepseek-v4-flash": {
+      "id": "deepseek-v4-flash", "maxTokens": 384000, "contextTokens": 1000000, "outputTokens": 384000, "temperature": 1,
+      "request": { "thinking": { "type": "enabled" }, "reasoning_effort": "max" },
+      "pricing": { "inputCacheHit": 6e-9, "inputCacheMiss": 3e-7, "output": 1.2e-6 },
+      "rates": {
+        "legacy": { "inputCacheHit": 3e-9, "inputCacheMiss": 1.5e-7, "output": 6e-7 },
+        "off":    { "inputCacheHit": 3e-9, "inputCacheMiss": 1.5e-7, "output": 6e-7 },
+        "peak":   { "inputCacheHit": 6e-9, "inputCacheMiss": 3e-7, "output": 1.2e-6 }
+      }
+    },
+    "deepseek-v4-flash-vision-exp": {
+      "id": "deepseek-v4-flash-vision-exp", "maxTokens": 384000, "contextTokens": 1000000, "outputTokens": 384000, "temperature": 1,
+      "request": { "thinking": { "type": "enabled" }, "reasoning_effort": "max" },
+      "pricing": { "inputCacheHit": 6e-9, "inputCacheMiss": 3e-7, "output": 1.2e-6 },
+      "rates": {
+        "legacy": { "inputCacheHit": 3e-9, "inputCacheMiss": 1.5e-7, "output": 6e-7 },
+        "off":    { "inputCacheHit": 3e-9, "inputCacheMiss": 1.5e-7, "output": 6e-7 },
+        "peak":   { "inputCacheHit": 6e-9, "inputCacheMiss": 3e-7, "output": 1.2e-6 }
+      }
+    },
+    "deepseek-v4-pro": {
+      "id": "deepseek-v4-pro", "maxTokens": 384000, "contextTokens": 1000000, "outputTokens": 384000, "temperature": 1,
+      "request": { "thinking": { "type": "enabled" }, "reasoning_effort": "max" },
+      "pricing": { "inputCacheHit": 4.4e-8, "inputCacheMiss": 1.32e-6, "output": 3.96e-6 },
+      "rates": {
+        "legacy": { "inputCacheHit": 3.625e-9, "inputCacheMiss": 4.35e-7, "output": 8.7e-7 },
+        "off":    { "inputCacheHit": 2.2e-8,   "inputCacheMiss": 6.6e-7,  "output": 1.98e-6 },
+        "peak":   { "inputCacheHit": 4.4e-8,   "inputCacheMiss": 1.32e-6, "output": 3.96e-6 }
+      }
+    }
+  },
+  "windows": [[1,4],[6,10]],
+  "epoch": 1789012800000
+}
