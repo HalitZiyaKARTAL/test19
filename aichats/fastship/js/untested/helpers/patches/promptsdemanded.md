@@ -6,3 +6,7 @@ without waiting 500ms since synchronous call can clog it, so it must be complete
 apply to live app
 
 ---
+
+oh 500ms ones should save it too,  and also tool call should be displayed first and response can arrive after its done,  so user can see the call while waiting response
+
+---
