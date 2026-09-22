@@ -211,3 +211,121 @@ on('expToolEchoCollapse', 'change', e => {
 - Changing the number changes the effective threshold immediately (no reload).
 - Applies to **both** `// Executing:` and `// Result` blocks.
 - Existing unrelated behavior (`blockAutoCollapse` / `blockCollapseSize=5000`) unchanged.
+
+
+
+
+
+
+---
+---
+---
+---
+---
+
+
+
+# Review of `96Rcandidate21a.js` (v5.6.0) vs live `96.js` (eval1 v4.10.0)
+
+**Verdict:** A close, faithful port — **0 missing API names, same keys/flags/tools/style-ids** — and it *fixes* three real 96 bugs. But it is **not a clean drop-in**: it carries a batch of regressions, one over-aggressive security change, and an entire second layer of hazards that only appear when you hot-swap instead of reload. Below is everything, organized.
+
+**Severity legend:** 🔴 breaks/regresses behavior · 🟠 real but narrow · 🟡 verify/intentional · ⚪ hygiene
+**Scope legend:** `[fresh]` = happens on your stated flow (refresh → load 96R) · `[swap]` = only when 96 is replaced in-place
+
+---
+
+## 0. Method & confidence
+- Static presence-diff of live `__eval1` surface vs `c21a` text; compile-check of all six stored candidates (all OK, never executed).
+- Line-by-line reading of boot guard → config → pricing → fetch → tool loop → UI → `disable()`.
+- Not runtime-verified: the recursive `oneTurn` tool loop, real bridge parsing, peak timing (flagged in §6).
+
+---
+
+## 1. ✅ Parity — confirmed identical
+
+| Surface | Result |
+|---|---|
+| `__eval1` functions | **42/42 present** (superset, ~101 total) |
+| `__eval1.config` keys | all present (**+ `estimate`**) |
+| Flags | 6, identical (`marked, anthropic, hybrid, pill, bridgeStream, tools`) |
+| Tool aliases | `tool_eval_1…7` |
+| Style-sheet ids | 9/9 identical |
+| Load contract | same IIFE; sets `__eval1.version` → `5.6.0` |
+| Persistence | reads `dse_eval1_config`/`_flags`; dual-writes `dse_96R_*` → migration-safe |
+| Host fns patched | all via one `R.host` adapter (15 — more than 96) |
+| Bridges / coalescer / `toAnthropic` / translators | ported faithfully; cache-mask naming kept |
+| Boot guard | **better** than 96: version-compare + abort-on-downgrade |
+
+**And it fixes 3 genuine 96 bugs:**
+1. `setToolEchoCollapse` wrote config key `toolEchoCollapse` but the renderer reads `toolEchoCollapseChars` → **96's toolbar control was a no-op**; c21a points it at the right key.
+2. 96's `disable()` **leaked all 9 `<style>` tags**; c21a tracks `R.CSS` and removes them.
+3. Four pricing sources + shallow-copy aliasing → one source.
+
+---
+
+## 2. 🔴 Definite bugs / regressions
+
+| # | Finding | Scope | Why it matters |
+|---|---|---|---|
+| **B1** | **`__sealEval` fires on *every* provider-JSON save.** 96 sealed only when a **brand-new provider containing `eval`** was added. c21a: `if (R.cfg.evalInProviders && R.__sealEval) R.__sealEval();` → unconditional. | `[fresh]` | With `technicalUser` on + "Riskier" off, **editing any provider silently flips `evalInProviders` OFF.** Your live config is `evalInProviders:true, technicalUser:true`. Contradicts the documented contract. |
+| **B2** | **`window.__pricingEngine` gutted on fresh load.** 96 exposed `tables.{legacy,off,peak,windows}`, `effectiveAt`, `isPeak`, `hasRealPeak`, `schedFor`, `registerSched`, `install`, `audit`; c21a sets only `epoch`, `tables.{epoch}`, `priceAt`. `dse_pricing_epochs` now stores `{epoch}`. | `[fresh]` | App cost path fine (reads `providers…pricing` getters), but **any external tooling/other patch reading `PE.*` breaks**. On `[swap]` the old rich object lingers (see §4). |
+| **B3** | **Provider migration narrowed to `deepseek` only.** 96's `evolve()` re-synced **any** provider equal to its factory default (openai/gemini/zai); c21a `continue`s past all non-deepseek. | `[fresh]` | Drifted non-deepseek defaults are never re-normalized. |
+| **B4** | **Tool-call normalization drops `tc.function`.** `var f = tc.function || {}; … if(!f.name) f.name=…` — never writes `f` back to `tc`. 96 did `tc.function = tc.function || {}`. | `[fresh]` | A tool-call arriving without a `function` object → "unknown tool". Edge (streamed calls populate it), but a real divergence. |
+| **B5** | **`installPricing()` scope narrow.** 96's `install()` patched **`providers` *and* `default_providers`**; c21a patches **only live `providers`**. | `[fresh]` | `modelPricing(p,id)` falls back to `default_providers`, so any un-priced provider now resolves against the app's **baked legacy numbers** (3.625e-9/4.35e-7/8.7e-7), not date-aware ones. |
+| **B6** | **`disable()` leaks `window.__s16b`** (stream throttle map) — created lazily, absent from the delete list. | `[fresh]` | Silent growth; residue after teardown. |
+| **B7** | **`R.audit()` (buffer) semantics changed.** 96 keyed TTLs on *matched vs unmatched* (24 h/7 d); c21a keys on *own vs foreign*. | `[fresh]` | Can prune an **own unmatched** buffer at 24 h — a recoverable interrupted stream 96 would keep 7 d. |
+| **B8** | **`auditPricing()` lost `.context`** (96: `{context,counts,total,rows}`; c21a: `{counts,total,rows}`), and is now **tautological** — it compares the getter to the `priceAt` that *is* the getter, so it can never report `wrong`. | `[fresh]` | Breaks tooling; audit is meaningless. |
+| **B9** | **`estimateGatePipe` is dead code** — defined but never registered in `applyFetch()`; only the `sendMessage` gate runs. | `[fresh]` | Harmless today (feature off), but misleading. |
+| **B10** | **Tool `run` dropped 96's hidden-tab note** — 96 appended `bg:true`/`note:'tab hidden…'`; c21a returns only `{ok,ms,result\|error}`. | `[fresh]` | Tool results are a different shape; model loses the throttle hint. |
+| **B11** | **`__apiModels` pollutes provider objects.** Patched `fetchModels` writes `pv[id].__apiModels = r` into the **live** provider, which then serializes into `dse_providers`. | `[fresh]` | Provider-JSON pollution; round-trips through migration. |
+
+---
+
+## 3. 🟡 Behavior changes to verify (may be intentional)
+
+- **`defaultModel` changed to `'deepseek-flash'`** in `providerDefaults.deepseek`; c21a also *adds* a `deepseek-flash` model. If `providers.deepseek.source==='default'`, **each load replaces your deepseek provider with CANON**.
+- **`applyProviderDefault()` runs on every load** (96 used a one-time `__eval1_88_def` guard) → re-clobbers a `source:'default'` provider each boot.
+- **UI affordances**: sub-row greying when `Agentic tools ≠ on` (96's 63.js) is **gone**; pill text drops `· <model> · 🔎n`; `#expToolEchoCollapse` no longer starts `disabled` when its toggle is off.
+- **`R.set()` semantics changed** — 96 validated via a `SETTERS` table; c21a throws on unknown keys (`NS.set('paintInterval',…)` now throws). Its *slot form* (`R.set(name,fn)`) writes `R._slots` but **cannot reach the real host binding** → desyncs.
+- **`resolveTools` mutates `R.cfg.webSearch`** from prior tools (parity with 96, but note it's unsaved/transient).
+- **`R.providerDefaults` dropped 96's openrouter balance config** → openrouter balance support gone (minor; not in default providers).
+
+---
+
+## 4. 🔴 `[swap]`-only: 96's leaky teardown contaminates the swap
+
+This is the subtle layer: **c21a trusts 96's `disable()` to be clean, and it isn't.**
+
+1. **Pricing engine bypassed.** 96's `PE.install()` stamped **live `dyn()` getters** onto `providers.deepseek…pricing`. 96's `disable()` never undoes them → c21a's `installPricing()` hits `isGetterProp(pr,'output')` and **skips** them. Net: deepseek costs keep flowing through **96's still-alive closure**, and c21a's "provider-JSON is the only truth" design **never takes effect for deepseek**.
+2. **`openCostInfo`/`closeCostInfo` residue.** 96 wrapped these *outside* the `__85_orig` system → c21a captures a **96 wrapper** as its "original" → double balance injection, and `disable()` can never restore the true original (**circular**).
+3. **96's `__eval1_peakObs` MutationObserver isn't disconnected** by 96's `disable()` → keeps firing `applyPeakDisplay` into the half-dead closure, fighting c21a on the `dse-peak`/`dse-discount` body classes.
+4. **Boot guard has no post-`disable()` verification.** If 96's `disable()` throws partway (or a `__eval1` exists with hooks but no `disable`), c21a proceeds and captures **already-wrapped** host fns into `R.host.orig` → wrappers stack and c21a's own `disable()` "restores" to a wrapper.
+
+> **Your flow (refresh → load 96R) is immune to all of §4.** But "swap in place" ≠ "reload," and the readme treats them as equivalent.
+
+---
+
+## 5. ⚪ Hygiene / cosmetic
+- `patchHost` and `patchFn` are **byte-identical** — one is dead weight.
+- The **module system is decorative**: `R.pipe/use/_mods/_down` exist, and `_mods` is seeded with bare `{id,version}` stubs, so **no module runs `setup`/`teardown`** — `disable()` is still hand-rolled.
+- `R.executeAPI` (property) ≠ host `executeAPI` after the balance wrap → stale.
+- fontScale restore is **RAM-only**: `defaultSettings.fontScale=0.8` was set permanently and `metadata.settings.fontScale` keeps 0.8 → the 0.5→0.8 change is **sticky across disable+reload**.
+- `dse_eval1_config` may still carry 96's stale `toolEchoCollapse` key (harmless; re-saved).
+
+---
+
+## 6. ❓ Cannot be certified statically (needs the harness)
+- The **recursive `oneTurn` promise loop** (resolve/reject across `finishTurn()` early-returns + stream-reader recursion) — highest-risk rewrite.
+- Real **bridge parse** (anthropic/responses SSE), peak/discount timing, balance fetch.
+- Whether `disable()` fully unwinds on a *real* session.
+
+---
+
+## 7. Recommended fix order (for a `c21a → c21b`)
+1. **B1** seal trigger — restore "new provider only."
+2. **B2 / B5 / B3** — restore `__pricingEngine` surface; patch `default_providers` too; widen migration.
+3. **§4.1/4.4** — make `installPricing()` **overwrite** existing getters (don't skip), and add a post-`disable()` integrity check.
+4. **B7 / B8 / B10 / B11** — audit semantics, `auditPricing` shape, tool `bg` note, `__apiModels` (use a WeakMap, not the provider object).
+5. **B4 / B6 / B9 + §3 & §5** — cleanup and small fixes.
+
+**Bottom line:** on the *contract* it's ~complete; on *behavior* it's ~95%. As a fresh reload it's close to safe after B1–B5. As a hot-swap it inherits 96's teardown debt and needs §4 addressed. Want me to draft the `c21b` patch for items 1–5?
