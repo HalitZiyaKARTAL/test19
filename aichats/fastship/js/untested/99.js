@@ -1,5 +1,5 @@
 /* ============================================================
-   EVAL1 v5.0.10 — 96claudeeditB13: 96claudeeditB12 + the built-in DeepSeek JSON without legacy rates; the provider
+   EVAL1 v5.1.0 — 96claudeeditB13: 96claudeeditB12 + the built-in DeepSeek JSON without legacy rates; the provider
    migration resets any built-in provider tagged 'default' or equal to the app's own default (DeepSeek no longer special);
    a tool-loop reply stopped or dropped mid-round gets its peak label from every billed round.
    B12 was 96claudeeditB11 + the Exp tab rebuild (__eval1._rebuildExpTab) keeps the
@@ -34,7 +34,7 @@
 (() => {
 
 /* ============================ CORE ============================ */
-const VERSION = '5.0.10';
+const VERSION = '5.1.0';
 /* ===== PASTE RULE — replace the running build only if it is the same version or older =====
    Tailor it by editing the three trues. A build turned off by disable() counts as nothing running. */
 const older = (a, b) => { const x = String(a).split('.'), y = String(b).split('.');   /* a <= b, numeric parts; unreadable → true */
